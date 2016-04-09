@@ -1,0 +1,221 @@
+/*
+ * A trace consists of header information and a list of instruction information. 
+ * Different instructions have different information, so the main trick is to use 
+ * variant type to represent instructions.
+ *
+ * Since protobuf does not support variant type, the main trick is to use a message 
+ * have multiple optional sub-messages, and an id to identify which is the real 
+ * sub-message of the message.
+ */
+
+syntax = "proto2";
+
+package trace_format;
+
+enum architecture_t
+{
+  X86    = 0;
+  X86_64 = 1;
+}
+
+enum typeid_address_t
+{
+	BIT8   = 0;
+	BIT16  = 1;
+	BIT32  = 2;
+	BIT64  = 3;
+	BIT128 = 4;
+};
+
+message address_t
+{
+  required typeid_address_t typeid = 1;
+  optional uint32 value_8          = 2;
+  optional uint32 value_16         = 3;
+  optional uint32 value_32         = 4;
+  optional uint64 value_64         = 5;
+  optional bytes value_128         = 6;
+}
+
+/* header = (architecture, address size) */
+
+message header_t
+{
+  required architecture_t architecture   = 1;
+  required typeid_address_t address_size = 2;
+}
+
+/* metadata = (module | exception | wave) */
+
+enum typeid_metadata_t
+{
+	EXCEPTION_TYPE = 0x0;
+	MODULE_TYPE    = 0x1;
+	WAVE_TYPE     = 0x2;
+}
+
+message module_t
+{
+	required string name = 1;
+}
+
+message exception_t
+{
+	required uint32 type_exception = 1;
+	required address_t handler     = 2;
+}
+
+message metadata_t
+{
+  required typeid_metadata_t typeid       = 1;
+  optional module_t module_metadata       = 2;
+  optional exception_t exception_metadata = 3;
+  optional uint32 wave_metadata          = 4;
+}
+
+/* register = (name, value) */
+
+message register_t 
+{
+  required string name         = 1;
+  required address_t value     = 2;
+}
+
+/* memory = (address, value) */
+
+message memory_t
+{
+  required address_t address = 1;
+  required address_t value   = 2;
+}
+
+/* call = (address, name, is traced) */
+
+message call_t
+{
+  required address_t func_addr = 1;
+  required string func_name    = 2;
+  required bool is_traced      = 3; 
+}
+
+/* syscall supplementary information */
+
+message sys_open_t
+{
+	required string file_name = 1;
+	required sint32 flags     = 2;
+	required uint32 mode      = 3;
+  required int32 file_descriptor = 4;
+}
+
+message sys_read_t
+{
+	required uint32 file_descriptor   = 1;
+	required address_t buffer_address = 2;
+	required uint32 count             = 3;
+	required bytes buffer_data        = 4;
+  required uint32 count_effective   = 5;
+}
+
+message sys_write_t
+{
+	required uint32 file_descriptor   = 1;
+	required address_t buffer_address = 2;
+	required uint32 count             = 3;
+	required bytes buffer_data        = 4;
+  required uint32 count_effective   = 5;
+}
+
+message sys_generic_t
+{
+    required string name = 1;
+    required uint32 address = 2;    
+}
+
+enum typeid_syscall_t
+{
+	OPEN_SYSCALL  = 0;
+	READ_SYSCALL  = 1;
+	WRITE_SYSCALL = 2;
+  GENERIC_SYSCALL = 3;
+}
+
+message syscall_sup_info_t
+{
+  required typeid_syscall_t typeid  = 1;
+  optional sys_open_t open_syscall  = 2;
+  optional sys_read_t read_syscall  = 3;
+  optional sys_write_t write_sycall = 4;
+  optional sys_generic_t generic_sycall = 5;
+}
+
+/* syscall = (id, syscall supplementary info) */
+
+message syscall_t
+{
+  required uint32 id               = 1;
+  optional syscall_sup_info_t info = 2;
+}
+
+/* ins concrete info = (load/store reg | load/store mem | ret/call return value | wave | syscall | comment) */
+
+enum typeid_con_info_t
+{
+	REGREAD       = 0x0;
+	REGWRITE      = 0x1;
+	MEMLOAD       = 0x2;
+	MEMSTORE      = 0x3;
+	CALL          = 0x4;
+	RET           = 0x5;
+	SYSCALL       = 0x6;
+	NOT_RETRIEVED = 0x7;
+  NEXT_ADDRESS  = 0x8;
+	COMMENT       = 0xFF;
+}
+ 
+message ins_con_info_t
+{
+  required typeid_con_info_t typeid  = 1;
+  optional register_t read_register  = 2;
+  optional register_t write_register = 3;
+  optional memory_t load_memory      = 4;
+  optional memory_t store_memory     = 5;
+  optional call_t call               = 6;
+  optional address_t ret_ret_value   = 7;
+  optional syscall_t system_call     = 8;
+  optional address_t next_address    = 9;
+  optional bytes reserved_comment    = 10;
+}
+
+/* instruction = (thread_id, address, opcode, concrete_info*) */
+
+message instruction_t
+{
+  required uint32 thread_id             = 1;
+  required address_t address            = 2;
+  required bytes opcode                 = 3;
+  repeated ins_con_info_t concrete_info = 4;
+}
+
+/* body = (metadata|instruction) */
+
+enum typeid_body_t
+{
+	METADATA    = 0x0;
+	INSTRUCTION = 0x1;
+}
+
+message body_t
+{
+  required typeid_body_t typeid      = 1;
+  optional metadata_t metadata       = 2;
+  optional instruction_t instruction = 3;
+}
+
+/* trace = (header, body*) */
+
+message trace_t
+{
+	required header_t header = 1;
+	repeated body_t body     = 2;
+}
