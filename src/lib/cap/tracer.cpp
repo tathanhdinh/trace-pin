@@ -515,6 +515,7 @@ static auto add_to_trace (ADDRINT ins_addr, THREADID thread_id) -> void
         cap_flush_trace();
       }
     }
+
   }
 
   return;
@@ -765,6 +766,8 @@ static auto update_condition_before_handling (INS ins) -> void
 static auto insert_ins_get_info_callbacks (INS ins) -> void
 {
   auto ins_addr = INS_Address(ins);
+
+  global_ins = ins;
 
   /*
    * Update the code cache if a new instruction found (be careful for self-modifying code)

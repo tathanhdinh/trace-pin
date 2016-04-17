@@ -51,7 +51,7 @@ enum typeid_metadata_t
 {
 	EXCEPTION_TYPE = 0x0;
 	MODULE_TYPE    = 0x1;
-	WAVE_TYPE      = 0x2;
+	WAVE_TYPE     = 0x2;
 }
 
 message module_t
@@ -210,6 +210,11 @@ message body_t
   required typeid_body_t typeid      = 1;
   optional metadata_t metadata       = 2;
   optional instruction_t instruction = 3;
+}
+
+message chunk_t
+{
+  repeated body_t body = 1;
 }
 
 /* trace = (header, body*) */

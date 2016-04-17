@@ -51,7 +51,8 @@ instruction::instruction(const INS& ins)
     return (reg >= REG_MM_BASE);
   };
 
-  this->is_special = std::any_of(std::begin(this->src_registers), std::end(this->src_registers), is_special_reg) ||
+  this->is_special =
+      std::any_of(std::begin(this->src_registers), std::end(this->src_registers), is_special_reg) ||
       std::any_of(std::begin(this->dst_registers), std::end(this->dst_registers), is_special_reg) ||
       (this->category == XED_CATEGORY_X87_ALU) || (this->iclass == XED_ICLASS_XEND) || (this->category == XED_CATEGORY_LOGICAL_FP) ||
       (this->iclass == XED_ICLASS_PUSHA) || (this->iclass == XED_ICLASS_PUSHAD) || (this->iclass == XED_ICLASS_PUSHF) ||
