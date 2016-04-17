@@ -64,7 +64,7 @@ set(PINTOOL_SRCS
   src/lib/cap/tracer.cpp
   src/lib/cap/parser.cpp
   src/lib/type/instruction.cpp
-  src/lib/type/trace.pb.cc)
+  src/lib/type/trace_with_chunk.pb.cc)
 
 if((DEFINED FAST) AND (FAST STREQUAL "Yes"))
   set(FAST_DEFS "/D FAST_TRACING")

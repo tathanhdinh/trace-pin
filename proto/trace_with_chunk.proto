@@ -70,15 +70,16 @@ message metadata_t
   required typeid_metadata_t typeid       = 1;
   optional module_t module_metadata       = 2;
   optional exception_t exception_metadata = 3;
-  optional uint32 wave_metadata          = 4;
+  optional uint32 wave_metadata           = 4;
 }
 
 /* register = (name, value) */
 
 message register_t 
 {
-  required string name         = 1;
-  required address_t value     = 2;
+  required string name     = 1;
+  required address_t value = 2;
+  // required uint8 value = 2;
 }
 
 /* memory = (address, value) */
@@ -91,71 +92,71 @@ message memory_t
 
 /* call = (address, name, is traced) */
 
-message call_t
-{
-  required address_t func_addr = 1;
-  required string func_name    = 2;
-  required bool is_traced      = 3; 
-}
+// message call_t
+// {
+//   required address_t func_addr = 1;
+//   required string func_name    = 2;
+//   required bool is_traced      = 3; 
+// }
 
 /* syscall supplementary information */
 
-message sys_open_t
-{
-	required string file_name = 1;
-	required sint32 flags     = 2;
-	required uint32 mode      = 3;
-  required int32 file_descriptor = 4;
-}
+// message sys_open_t
+// {
+// 	required string file_name = 1;
+// 	required sint32 flags     = 2;
+// 	required uint32 mode      = 3;
+//   required int32 file_descriptor = 4;
+// }
 
-message sys_read_t
-{
-	required uint32 file_descriptor   = 1;
-	required address_t buffer_address = 2;
-	required uint32 count             = 3;
-	required bytes buffer_data        = 4;
-  required uint32 count_effective   = 5;
-}
+// message sys_read_t
+// {
+// 	required uint32 file_descriptor   = 1;
+// 	required address_t buffer_address = 2;
+// 	required uint32 count             = 3;
+// 	required bytes buffer_data        = 4;
+//   required uint32 count_effective   = 5;
+// }
 
-message sys_write_t
-{
-	required uint32 file_descriptor   = 1;
-	required address_t buffer_address = 2;
-	required uint32 count             = 3;
-	required bytes buffer_data        = 4;
-  required uint32 count_effective   = 5;
-}
+// message sys_write_t
+// {
+// 	required uint32 file_descriptor   = 1;
+// 	required address_t buffer_address = 2;
+// 	required uint32 count             = 3;
+// 	required bytes buffer_data        = 4;
+//   required uint32 count_effective   = 5;
+// }
 
-message sys_generic_t
-{
-    required string name = 1;
-    required uint32 address = 2;    
-}
+// message sys_generic_t
+// {
+//     required string name = 1;
+//     required uint32 address = 2;    
+// }
 
-enum typeid_syscall_t
-{
-	OPEN_SYSCALL  = 0;
-	READ_SYSCALL  = 1;
-	WRITE_SYSCALL = 2;
-  GENERIC_SYSCALL = 3;
-}
+// enum typeid_syscall_t
+// {
+// 	OPEN_SYSCALL  = 0;
+// 	READ_SYSCALL  = 1;
+// 	WRITE_SYSCALL = 2;
+//   GENERIC_SYSCALL = 3;
+// }
 
-message syscall_sup_info_t
-{
-  required typeid_syscall_t typeid  = 1;
-  optional sys_open_t open_syscall  = 2;
-  optional sys_read_t read_syscall  = 3;
-  optional sys_write_t write_sycall = 4;
-  optional sys_generic_t generic_sycall = 5;
-}
+// message syscall_sup_info_t
+// {
+//   required typeid_syscall_t typeid  = 1;
+//   optional sys_open_t open_syscall  = 2;
+//   optional sys_read_t read_syscall  = 3;
+//   optional sys_write_t write_sycall = 4;
+//   optional sys_generic_t generic_sycall = 5;
+// }
 
-/* syscall = (id, syscall supplementary info) */
+// /* syscall = (id, syscall supplementary info) */
 
-message syscall_t
-{
-  required uint32 id               = 1;
-  optional syscall_sup_info_t info = 2;
-}
+// message syscall_t
+// {
+//   required uint32 id               = 1;
+//   optional syscall_sup_info_t info = 2;
+// }
 
 /* ins concrete info = (load/store reg | load/store mem | ret/call return value | wave | syscall | comment) */
 
@@ -165,11 +166,11 @@ enum typeid_con_info_t
 	REGWRITE      = 0x1;
 	MEMLOAD       = 0x2;
 	MEMSTORE      = 0x3;
-	CALL          = 0x4;
-	RET           = 0x5;
-	SYSCALL       = 0x6;
-	NOT_RETRIEVED = 0x7;
-  NEXT_ADDRESS  = 0x8;
+	// CALL          = 0x4;
+	// RET           = 0x5;
+	// SYSCALL       = 0x6;
+	// NOT_RETRIEVED = 0x7;
+  // NEXT_ADDRESS  = 0x8;
 	COMMENT       = 0xFF;
 }
  
@@ -180,10 +181,10 @@ message ins_con_info_t
   optional register_t write_register = 3;
   optional memory_t load_memory      = 4;
   optional memory_t store_memory     = 5;
-  optional call_t call               = 6;
-  optional address_t ret_ret_value   = 7;
-  optional syscall_t system_call     = 8;
-  optional address_t next_address    = 9;
+  // optional call_t call               = 6;
+  // optional address_t ret_ret_value   = 7;
+  // optional syscall_t system_call     = 8;
+  // optional address_t next_address    = 9;
   optional bytes reserved_comment    = 10;
 }
 
@@ -195,6 +196,7 @@ message instruction_t
   required address_t address            = 2;
   required bytes opcode                 = 3;
   repeated ins_con_info_t concrete_info = 4;
+  required string disassemble           = 5;
 }
 
 /* body = (metadata|instruction) */

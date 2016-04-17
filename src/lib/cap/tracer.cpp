@@ -13,13 +13,6 @@
 #include <boost/type_traits.hpp>
 #include <typeinfo>
 
-//static auto use_predicated_callback = false;
-
-//#if defined(USE_PREDICATED_CALLBACK)
-//using ins_insert_call = INS_InsertPredicatedCall;
-//#else
-//using ins_insert_call = INS_InsertCall;
-//#endif
 using ins_callback_func_t = VOID(*)(INS ins, IPOINT ipoint, AFUNPTR funptr, ...);
 
 template <bool use_predicated_callback>
@@ -105,7 +98,7 @@ static auto patched_memory_at_address          = std::vector<patch_point_memory_
 static auto patched_indirect_memory_at_address = std::vector<patch_point_indirect_memory_t>();
 static auto execution_order_of_address         = std::map<ADDRINT, UINT32>();
 
-static auto current_syscall_info               = syscall_info_t();
+//static auto current_syscall_info               = syscall_info_t();
 
 static auto some_thread_is_started             = false;
 static auto some_thread_is_not_suspended       = true;
@@ -126,14 +119,6 @@ enum event_t
   SUSPEND_TO_ENABLE   = 5
 };
 
-
-//auto normalize_hex_string (const std::string& input) -> std::string
-//{
-//  assert(input.find("0x") == 0);
-//  auto first_non_zero_iter = std::find_if(std::begin(input) + 2, std::end(input), [](char c) { return (c != '0');});
-//  auto output = first_non_zero_iter != std::end(input) ? std::string(first_non_zero_iter, std::end(input)) : std::string("0");
-//  return ("0x" + output);
-//}
 
 static auto reinstrument_if_some_thread_started (ADDRINT current_addr,
                                                  ADDRINT next_addr, const CONTEXT* p_ctxt) -> void
@@ -316,9 +301,9 @@ static auto initialize_instruction (ADDRINT ins_addr, THREADID thread_id) -> voi
                                          dyn_regs_t(),      // read registers
                                          dyn_regs_t(),      // written registers
                                          dyn_mems_t(),      // read memory addresses
-                                         dyn_mems_t(),      // write memory addresses
-                                         concrete_info_t{}, // other concrete information
-                                         0x0                // next instruction address
+                                         dyn_mems_t()      // write memory addresses
+//                                         concrete_info_t{} // other concrete information
+//                                         0x0                // next instruction address
                                          );
   }
   return;
@@ -443,52 +428,52 @@ static auto save_memory (ADDRINT mem_addr, UINT32 mem_size, THREADID thread_id) 
 //  return;
 //}
 
-static auto save_call_concrete_info (ADDRINT called_addr, THREADID thread_id) -> void
-{
-  auto get_called_func_name = [](ADDRINT called_addr) -> std::string {
-    PIN_LockClient();
-    auto routine = RTN_FindByAddress(called_addr);
-    PIN_UnlockClient();
+//static auto save_call_concrete_info (ADDRINT called_addr, THREADID thread_id) -> void
+//{
+//  auto get_called_func_name = [](ADDRINT called_addr) -> std::string {
+//    PIN_LockClient();
+//    auto routine = RTN_FindByAddress(called_addr);
+//    PIN_UnlockClient();
 
-    if (RTN_Valid(routine)) {
-      auto routine_mangled_name = RTN_Name(routine);
-      return PIN_UndecorateSymbolName(routine_mangled_name, UNDECORATION_NAME_ONLY);
-    }
-    else return "";
-  };
+//    if (RTN_Valid(routine)) {
+//      auto routine_mangled_name = RTN_Name(routine);
+//      return PIN_UndecorateSymbolName(routine_mangled_name, UNDECORATION_NAME_ONLY);
+//    }
+//    else return "";
+//  };
 
-  if (ins_at_thread.find(thread_id) != ins_at_thread.end()) {
-    ASSERTX(cached_ins_at_addr[std::get<INS_ADDRESS>(ins_at_thread[thread_id])]->is_call);
+//  if (ins_at_thread.find(thread_id) != ins_at_thread.end()) {
+//    ASSERTX(cached_ins_at_addr[std::get<INS_ADDRESS>(ins_at_thread[thread_id])]->is_call);
 
-    if (state_of_thread[thread_id] == ENABLED) {
-      auto call_info = call_info_t{};
-      call_info.called_fun_addr = called_addr;
+//    if (state_of_thread[thread_id] == ENABLED) {
+//      auto call_info = call_info_t{};
+//      call_info.called_fun_addr = called_addr;
 
-      if (cached_ins_at_addr.find(called_addr) != cached_ins_at_addr.end()) {
-        call_info.called_fun_name = cached_ins_at_addr[called_addr]->including_routine_name;
-      }
-      else {
-        call_info.called_fun_name = get_called_func_name(called_addr);
-      }
+//      if (cached_ins_at_addr.find(called_addr) != cached_ins_at_addr.end()) {
+//        call_info.called_fun_name = cached_ins_at_addr[called_addr]->including_routine_name;
+//      }
+//      else {
+//        call_info.called_fun_name = get_called_func_name(called_addr);
+//      }
 
-      auto ins_addr = std::get<INS_ADDRESS>(ins_at_thread[thread_id]);
-      if ((std::find(
-             std::begin(full_skip_call_addresses), std::end(full_skip_call_addresses), ins_addr
-             ) != std::end(full_skip_call_addresses)) /*||
-          (std::find(
-             std::begin(selective_skip_call_addresses), std::end(selective_skip_call_addresses), ins_addr
-             ) != std::end(selective_skip_call_addresses))*/) {
-        call_info.is_traced = false;
-      }
-      else {
-        call_info.is_traced = true;
-      }
+//      auto ins_addr = std::get<INS_ADDRESS>(ins_at_thread[thread_id]);
+//      if ((std::find(
+//             std::begin(full_skip_call_addresses), std::end(full_skip_call_addresses), ins_addr
+//             ) != std::end(full_skip_call_addresses)) /*||
+//          (std::find(
+//             std::begin(selective_skip_call_addresses), std::end(selective_skip_call_addresses), ins_addr
+//             ) != std::end(selective_skip_call_addresses))*/) {
+//        call_info.is_traced = false;
+//      }
+//      else {
+//        call_info.is_traced = true;
+//      }
 
-      std::get<INS_CONCRETE_INFO>(ins_at_thread[thread_id]) = call_info;
-    }
-  }
-  return;
-}
+//      std::get<INS_CONCRETE_INFO>(ins_at_thread[thread_id]) = call_info;
+//    }
+//  }
+//  return;
+//}
 
 
 static auto add_to_trace (ADDRINT ins_addr, THREADID thread_id) -> void
@@ -501,8 +486,8 @@ static auto add_to_trace (ADDRINT ins_addr, THREADID thread_id) -> void
 
 //      tfm::printfln("0x%-12x %s", ins_addr, cached_ins_at_addr[ins_addr]->disassemble);
 
-      std::get<INS_NEXT_ADDRESS>(ins_at_thread[thread_id]) = ins_addr;
-      trace.push_back(ins_at_thread[thread_id]);
+//      std::get<INS_NEXT_ADDRESS>(ins_at_thread[thread_id]) = ins_addr;
+//      trace.push_back(ins_at_thread[thread_id]);
 
 //      tfm::printfln("trace length: %d", trace.size());
 
@@ -767,8 +752,6 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
 {
   auto ins_addr = INS_Address(ins);
 
-  global_ins = ins;
-
   /*
    * Update the code cache if a new instruction found (be careful for self-modifying code)
    */
@@ -936,19 +919,19 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
 
 #if defined(FAST_TRACING)
 #else
-      if (current_ins->is_call) {
+//      if (current_ins->is_call) {
 
-        static_assert(std::is_same<
-                      decltype(save_call_concrete_info), VOID (ADDRINT, UINT32)
-                      >::value, "invalid callback function type");
+//        static_assert(std::is_same<
+//                      decltype(save_call_concrete_info), VOID (ADDRINT, UINT32)
+//                      >::value, "invalid callback function type");
 
-        ins_insert_call<true>(ins,
-                       IPOINT_BEFORE,
-                       reinterpret_cast<AFUNPTR>(save_call_concrete_info),
-                       IARG_BRANCH_TARGET_ADDR,
-                       IARG_THREAD_ID,
-                       IARG_END);
-      }
+//        ins_insert_call<true>(ins,
+//                       IPOINT_BEFORE,
+//                       reinterpret_cast<AFUNPTR>(save_call_concrete_info),
+//                       IARG_BRANCH_TARGET_ADDR,
+//                       IARG_THREAD_ID,
+//                       IARG_END);
+//      }
 
       if (!current_ins->src_registers.empty() && !current_ins->is_special) {
 
@@ -1106,11 +1089,6 @@ static auto insert_ins_patch_info_callbacks (INS ins) -> void
             auto patch_point = std::get<1>(patch_exec_point);
             auto pin_patch_point = !patch_point ? IPOINT_BEFORE : IPOINT_AFTER;
 
-//            if (!cached_ins_at_addr[ins_addr]->has_fall_through) {
-//              pin_patch_point = IPOINT_BEFORE;
-//              ins = INS_Next(ins);
-//            }
-
             auto reg_size = REG_Size(patch_reg);
 
             ASSERTX(((reg_size == 1) || (reg_size == 2) || (reg_size == 4) || (reg_size == 8)) &&
@@ -1233,261 +1211,6 @@ static auto insert_ins_patch_info_callbacks (INS ins) -> void
 //      auto exec_addr = std::get<>
 //    });
     indirect_memory_is_patchable = point_is_patchable<decltype(patched_indirect_memory_at_address)>(patched_indirect_memory_at_address);
-  }
-  return;
-}
-
-
-template<uint32_t sys_id>
-auto update_syscall_entry_info (dyn_ins_t& instruction) -> void
-{
-  return;
-}
-
-template<>
-auto update_syscall_entry_info<CAP_SYS_OPEN> (dyn_ins_t& instruction) -> void
-{
-  auto syscall_open_info = sys_open_info_t{};
-
-  // path name
-  auto pathname_c_str = reinterpret_cast<char*>(std::get<SYSCALL_ARG_0>(current_syscall_info));
-  syscall_open_info.path_name = std::string(pathname_c_str);
-
-  // flags
-  auto flags = static_cast<int>(std::get<SYSCALL_ARG_1>(current_syscall_info));
-  syscall_open_info.flags = flags;
-
-  // mode
-  auto mode = static_cast<int>(std::get<SYSCALL_ARG_2>(current_syscall_info));
-  syscall_open_info.mode = mode;
-
-  std::get<INS_CONCRETE_INFO>(instruction) = syscall_open_info;
-
-  return;
-}
-
-template<>
-auto update_syscall_entry_info<CAP_SYS_READ> (dyn_ins_t& instruction) -> void/*concrete_info_t*/
-{
-  auto syscall_read_info = sys_read_info_t{};
-
-  // file descriptor
-  auto file_desc = static_cast<int>(std::get<SYSCALL_ARG_0>(current_syscall_info));
-  syscall_read_info.file_desc = file_desc;
-
-  // read buffer address
-  auto buf_addr = std::get<SYSCALL_ARG_1>(current_syscall_info);
-  syscall_read_info.buffer_addr = buf_addr;
-
-  // required read length
-  auto buf_length = static_cast<size_t>(std::get<SYSCALL_ARG_2>(current_syscall_info));
-  syscall_read_info.buffer_length = buf_length;
-
-//  auto buf = std::make_shared<uint8_t>(buf_length);
-//  std::copy(buf.get(), buf.get() + buf_length, reinterpret_cast<uint8_t*>(buf_addr));
-//  syscall_read_info.buffer = buf;
-
-  std::get<INS_CONCRETE_INFO>(instruction) = syscall_read_info;
-
-  return;
-}
-
-template<>
-auto update_syscall_entry_info<CAP_SYS_WRITE> (dyn_ins_t& instruction) -> void
-{
-  auto syscall_write_info = sys_write_info_t{};
-
-  // file descriptor
-  auto file_desc = static_cast<int>(std::get<SYSCALL_ARG_0>(current_syscall_info));
-  syscall_write_info.file_desc = file_desc;
-
-  // write buffer address
-  auto buf_addr = std::get<SYSCALL_ARG_1>(current_syscall_info);
-  syscall_write_info.buffer_addr = buf_addr;
-
-  // required write length
-  auto buf_length = static_cast<size_t>(std::get<SYSCALL_ARG_2>(current_syscall_info));
-  syscall_write_info.buffer_length = buf_length;
-
-  auto buf = std::shared_ptr<uint8_t>(new uint8_t[buf_length], std::default_delete<uint8_t[]>());
-//  //  PIN_SafeCopy(buf.get(), reinterpret_cast<uint8_t*>(buf_addr), buf_length);
-  auto excp_info = EXCEPTION_INFO();
-  auto copied_buf_length = PIN_SafeCopyEx(buf.get(), reinterpret_cast<uint8_t*>(buf_addr), buf_length, &excp_info);
-  if (copied_buf_length != buf_length) {
-//    // auto excp_code = PIN_GetExceptionCode(&excp_info);
-    tfm::format(std::cerr, "error: %s\n", PIN_ExceptionToString(&excp_info));
-  }
-  syscall_write_info.buffer = buf;
-
-  std::get<INS_CONCRETE_INFO>(instruction) = syscall_write_info;
-
-  return;
-}
-
-template<>
-auto update_syscall_entry_info<CAP_SYS_OTHER> (dyn_ins_t& instruction) -> void
-{
-  std::get<INS_CONCRETE_INFO>(instruction) = sys_other_info_t(std::get<SYSCALL_ID>(current_syscall_info));
-  return;
-}
-
-
-static auto save_syscall_entry_info (THREADID thread_id, CONTEXT* p_context, SYSCALL_STANDARD syscall_std, VOID* data) -> VOID
-{
-  if (some_thread_is_started &&
-      (some_thread_is_not_suspended || some_thread_is_selective_suspended)) {
-
-    ASSERTX(state_of_thread.find(thread_id) != state_of_thread.end());
-
-    if ((state_of_thread[thread_id] == ENABLED) ||
-        (state_of_thread[thread_id] == SELECTIVE_SUSPENDED)) {
-      auto ins_addr = PIN_GetContextReg(p_context, REG_INST_PTR);
-
-      ASSERTX(ins_addr == std::get<INS_ADDRESS>(ins_at_thread[thread_id]));
-      ASSERTX(cached_ins_at_addr[ins_addr]->is_syscall);
-
-      std::get<SYSCALL_ID>(current_syscall_info) = PIN_GetSyscallNumber(p_context, syscall_std);
-      std::get<SYSCALL_ARG_0>(current_syscall_info) = PIN_GetSyscallArgument(p_context, syscall_std, 0);
-      std::get<SYSCALL_ARG_1>(current_syscall_info) = PIN_GetSyscallArgument(p_context, syscall_std, 1);
-      std::get<SYSCALL_ARG_2>(current_syscall_info) = PIN_GetSyscallArgument(p_context, syscall_std, 2);
-      std::get<SYSCALL_ARG_3>(current_syscall_info) = PIN_GetSyscallArgument(p_context, syscall_std, 3);
-
-      switch (std::get<SYSCALL_ID>(current_syscall_info))
-      {
-      case CAP_SYS_OPEN:
-        update_syscall_entry_info<CAP_SYS_OPEN>(ins_at_thread[thread_id]);
-        break;
-
-      case CAP_SYS_READ:
-        update_syscall_entry_info<CAP_SYS_READ>(ins_at_thread[thread_id]);
-        break;
-
-      case CAP_SYS_WRITE:
-        update_syscall_entry_info<CAP_SYS_WRITE>(ins_at_thread[thread_id]);
-        break;
-
-      default:
-        update_syscall_entry_info<CAP_SYS_OTHER>(ins_at_thread[thread_id]);
-        break;
-      }
-    }
-  }
-
-  return;
-}
-
-
-template<uint32_t sys_id>
-auto get_syscall_exit_concret_info (dyn_ins_t& instruction) -> void
-{
-  return;
-}
-
-template<>
-auto get_syscall_exit_concret_info<CAP_SYS_OPEN> (dyn_ins_t& instruction) -> void
-{
-  ASSERTX(std::get<INS_CONCRETE_INFO>(instruction).which() == 0);
-
-  auto & current_ins_sys_open = boost::get<sys_open_info_t>(std::get<INS_CONCRETE_INFO>(instruction));
-
-  // update file descriptor
-  current_ins_sys_open.file_desc = static_cast<int>(std::get<SYSCALL_RET>(current_syscall_info));
-
-  return;
-}
-
-template<>
-auto get_syscall_exit_concret_info<CAP_SYS_READ> (dyn_ins_t& instruction) -> void
-{
-  ASSERTX(std::get<INS_CONCRETE_INFO>(instruction).which() == 1);
-
-  auto & current_ins_sys_read = boost::get<sys_read_info_t>(std::get<INS_CONCRETE_INFO>(instruction));
-
-  // length and address of sys_read buffer
-  auto buf_length = current_ins_sys_read.buffer_length;
-  auto buf_addr = current_ins_sys_read.buffer_addr;
-
-  // create a buffer to store the read buffer
-  auto buf = std::shared_ptr<uint8_t>(new uint8_t[buf_length], std::default_delete<uint8_t[]>());
-
-  // read data into buf
-  auto excp_info = EXCEPTION_INFO();
-  auto copied_buf_length = PIN_SafeCopyEx(buf.get(), reinterpret_cast<uint8_t*>(buf_addr), buf_length, &excp_info);
-
-  if (copied_buf_length != buf_length) {
-    tfm::format(std::cerr, "error: %s\n", PIN_ExceptionToString(&excp_info));
-  }
-
-  // update data buffer and effective read length
-  current_ins_sys_read.buffer = buf;
-  current_ins_sys_read.read_length = std::get<SYSCALL_RET>(current_syscall_info);
-
-  return;
-}
-
-template<>
-auto get_syscall_exit_concret_info<CAP_SYS_WRITE> (dyn_ins_t& instruction) -> void
-{
-  ASSERTX(std::get<INS_CONCRETE_INFO>(instruction).which() == 2);
-
-  auto & current_ins_sys_write = boost::get<sys_write_info_t>(std::get<INS_CONCRETE_INFO>(instruction));
-
-  // update effective write length
-  current_ins_sys_write.write_length = std::get<SYSCALL_RET>(current_syscall_info);
-
-  return;
-}
-
-template<>
-auto get_syscall_exit_concret_info<CAP_SYS_OTHER> (dyn_ins_t& instruction) -> void
-{
-  ASSERTX(std::get<INS_CONCRETE_INFO>(instruction).which() == 3);
-  return;
-}
-
-
-static auto save_syscall_exit_concret_info (THREADID thread_id,
-                                            CONTEXT* p_context, SYSCALL_STANDARD syscall_std, VOID* data) -> VOID
-{
-  (void)data;
-
-  if (some_thread_is_started &&
-      (some_thread_is_not_suspended || some_thread_is_selective_suspended)) {
-
-    ASSERTX(state_of_thread.find(thread_id) != state_of_thread.end());
-
-    if ((state_of_thread[thread_id] == ENABLED) ||
-        (state_of_thread[thread_id] == SELECTIVE_SUSPENDED)) {
-
-      ASSERTX(cached_ins_at_addr[
-             std::get<INS_ADDRESS>(ins_at_thread[thread_id]
-                                   )]->is_syscall);
-
-      auto type_idx = std::get<INS_CONCRETE_INFO>(ins_at_thread[thread_id]).which();
-      ASSERTX((type_idx == 0) || (type_idx == 1) || (type_idx == 2) || (type_idx == 3));
-
-      // get return value
-      std::get<SYSCALL_RET>(current_syscall_info) = PIN_GetSyscallReturn(p_context, syscall_std);
-
-      switch (type_idx)
-      {
-      case 0: /* SYS_OPEN */
-        get_syscall_exit_concret_info<CAP_SYS_OPEN>(ins_at_thread[thread_id]);
-        break;
-
-      case 1: /* SYS_READ */
-        get_syscall_exit_concret_info<CAP_SYS_READ>(ins_at_thread[thread_id]);
-        break;
-
-      case 2: /* SYS_WRITE */
-        get_syscall_exit_concret_info<CAP_SYS_WRITE>(ins_at_thread[thread_id]);
-        break;
-
-      case 3: /* SYS_OTHER */
-        get_syscall_exit_concret_info<CAP_SYS_OTHER>(ins_at_thread[thread_id]);
-        break;
-      }
-    }
   }
   return;
 }
@@ -1701,13 +1424,6 @@ auto cap_add_full_skip_call_address (ADDRINT address) -> void
 }
 
 
-//auto cap_add_selective_skip_address (ADDRINT address) -> void
-//{
-//  selective_skip_call_addresses.push_back(address);
-//  return;
-//}
-
-
 auto cap_add_auto_skip_call_addresses (ADDRINT address) -> void
 {
   auto_skip_call_addresses.push_back(address);
@@ -1782,5 +1498,3 @@ ins_instrumentation_t cap_patch_instrunction_information = ins_mode_patch_ins_in
 trace_instrumentation_t cap_trace_mode_get_ins_info      = trace_mode_get_ins_info;
 trace_instrumentation_t cap_trace_mode_patch_ins_info    = trace_mode_patch_ins_info;
 img_instrumentation_t cap_img_mode_get_ins_info          = img_mode_get_ins_info;
-SYSCALL_ENTRY_CALLBACK cap_get_syscall_entry_info        = save_syscall_entry_info;
-SYSCALL_EXIT_CALLBACK cap_get_syscall_exit_info          = save_syscall_exit_concret_info;

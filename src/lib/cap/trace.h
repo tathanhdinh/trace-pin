@@ -76,13 +76,13 @@ struct call_info_t
   bool        is_traced;
 };
 
-using concrete_info_t = boost::variant<
-  sys_open_info_t,  // which = 0
-  sys_read_info_t,  // 1
-  sys_write_info_t, // 2
-  sys_other_info_t, // 3
-  call_info_t       // 4
-  >;
+//using concrete_info_t = boost::variant<
+//  sys_open_info_t,  // which = 0
+//  sys_read_info_t,  // 1
+//  sys_write_info_t, // 2
+//  sys_other_info_t, // 3
+//  call_info_t       // 4
+//  >;
 
 using dyn_ins_t = std::tuple<
   ADDRINT,        // address of instruction
@@ -90,9 +90,9 @@ using dyn_ins_t = std::tuple<
   dyn_regs_t,     // read registers
   dyn_regs_t,     // write registers
   dyn_mems_t,     // read memory addresses
-  dyn_mems_t,     // write memory addresses
-  concrete_info_t, // concrete information
-  ADDRINT         // address of next instruction
+  dyn_mems_t     // write memory addresses
+//  concrete_info_t // concrete information
+//  ADDRINT         // address of next instruction
   >;
 
 // list is prefered since new instructions will be added regularly
