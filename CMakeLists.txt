@@ -61,10 +61,10 @@ set(PIN_LIBRARY_DIRS
 # Pintool sources
 set(PINTOOL_SRCS
   src/main.cpp
-  src/lib/cap/tracer.cpp
-  src/lib/cap/parser.cpp
-  src/lib/type/instruction.cpp
-  src/lib/type/trace_with_chunk.pb.cc)
+  src/tracing/tracer.cpp
+  src/tracing/parser.cpp
+  src/tracing/instruction.cpp
+  src/tracing/trace_with_chunk.pb.cc)
 
 if((DEFINED FAST) AND (FAST STREQUAL "Yes"))
   set(FAST_DEFS "/D FAST_TRACING")
