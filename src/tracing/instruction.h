@@ -12,7 +12,7 @@ extern "C" {
 #include <vector>
 #include <map>
 
-#include "../tinyformat.h" // for testing only
+#include "tinyformat.h"
 
 class instruction
 {
