@@ -1,6 +1,0 @@
-#include "operand.h"
-
-operand::operand(ADDRINT addr)
-{
-  this->
-}
