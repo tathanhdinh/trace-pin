@@ -1,9 +1,9 @@
 //#include "parsing_helper.h"
 #include <pin.H>
 
-#include "lib/tinyformat.h"
-#include "lib/type/instruction.h"
-#include "lib/cap/cap.h"
+#include "tracing/tinyformat.h"
+#include "tracing/instruction.h"
+#include "tracing/export.h"
 
 #include <fstream>
 #include <boost/algorithm/string.hpp>

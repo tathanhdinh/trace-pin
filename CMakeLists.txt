@@ -62,9 +62,9 @@ set(PIN_LIBRARY_DIRS
 set(PINTOOL_SRCS
   src/main.cpp
   src/tracing/tracer.cpp
-  src/tracing/tracer.h
   src/tracing/consumer.cpp
   src/tracing/common.h
+  src/tracing/export.h
   src/tracing/instruction.cpp
   src/tracing/trace_with_chunk.pb.cc)
 
