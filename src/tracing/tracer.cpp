@@ -1,9 +1,9 @@
-#include "cap.h"
-#include "trace.h"
+#include "tracer.h"
+#include "common.h"
 
 //#include "../framework/analysis_callback.h"
 
-#include "../tinyformat.h"
+#include "tinyformat.h"
 
 #include <limits>
 #include <cassert>

@@ -12,7 +12,6 @@ auto cap_set_trace_length                   (uint32_t trace_length)             
 auto cap_set_start_address                  (ADDRINT address)                                        -> void;
 auto cap_set_stop_address                   (ADDRINT address)                                        -> void;
 auto cap_add_full_skip_call_address         (ADDRINT address)                                        -> void;
-//auto cap_add_selective_skip_address         (ADDRINT address)                                        -> void;
 auto cap_add_auto_skip_call_addresses       (ADDRINT address)                                        -> void;
 auto cap_set_loop_count                     (uint32_t count)                                         -> void;
 auto cap_verify_parameters                  ()                                                       -> void;
@@ -26,11 +25,6 @@ auto cap_add_patched_indirect_memory_value  (ADDRINT ins_address, UINT32 exec_or
                                              REG reg, UINT8 mem_size, ADDRINT mem_value)             -> void;
 
 // report functions
-//auto cap_save_trace_to_file                 (const std::string& filename, bool simple_or_proto) noexcept      -> void;
-//auto cap_load_trace_from_file               (const std::string& filename) noexcept                            -> void; // TODO or not TODO
-//auto cap_save_trace_to_dot_file             (const std::string& filename) noexcept                            -> void;
-//auto cap_save_basic_block_cfg_to_dot_file   (const std::string& filename) noexcept                            -> void;
-//auto cap_save_basic_block_trace_to_file     (const std::string& filename) noexcept                            -> void;
 auto cap_parser_initialize (const std::string& filename) -> void;
 auto cap_flush_trace () -> void;
 auto cap_parser_finalize () -> void;

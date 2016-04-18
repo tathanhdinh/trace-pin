@@ -1,9 +1,9 @@
 //#include "../../parsing_helper.h"
-#include "cap.h"
-#include "trace.h"
+#include "tracer.h"
+#include "common.h"
 
-#include "../type/trace_with_chunk.pb.h"
-#include "../tinyformat.h"
+#include "trace_with_chunk.pb.h"
+#include "tinyformat.h"
 
 #include <fstream>
 

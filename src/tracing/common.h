@@ -1,7 +1,7 @@
 #ifndef TRACE_H
 #define TRACE_H
 
-#include "../type/instruction.h"
+#include "instruction.h"
 
 #include <cstdlib>
 #include <algorithm>
