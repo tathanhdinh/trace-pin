@@ -61,7 +61,7 @@ set(PIN_LIBRARY_DIRS
 # Pintool sources
 set(PINTOOL_SRCS
   src/main.cpp
-  src/tracing/tracer.cpp
+  src/tracing/consumer.cpp
   src/tracing/parser.cpp
   src/tracing/instruction.cpp
   src/tracing/trace_with_chunk.pb.cc)
