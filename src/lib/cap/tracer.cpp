@@ -28,7 +28,6 @@ enum tracing_state_t
 {
   NOT_STARTED         = 0,
   FULL_SUSPENDED      = 1,
-  SELECTIVE_SUSPENDED = 2,
   ENABLED             = 3,
   DISABLED            = 4
 };
@@ -102,7 +101,6 @@ static auto execution_order_of_address         = std::map<ADDRINT, UINT32>();
 
 static auto some_thread_is_started             = false;
 static auto some_thread_is_not_suspended       = true;
-static auto some_thread_is_selective_suspended = false;
 
 /*====================================================================================================================*/
 /*                                       callback analysis and support functions                                      */
@@ -172,15 +170,7 @@ static auto reinstrument_because_of_suspended_state (const CONTEXT* p_ctxt, ADDR
                                [](decltype(state_of_thread)::const_reference thread_state) {
       static_assert(std::is_same<decltype(std::get<1>(thread_state)), const tracing_state_t&>::value, "type conflict");
 
-      return (std::get<1>(thread_state) != FULL_SUSPENDED) && (std::get<1>(thread_state) != SELECTIVE_SUSPENDED);
-  });
-
-  some_thread_is_selective_suspended = std::any_of(std::begin(state_of_thread), std::end(state_of_thread),
-                                                   [](decltype(state_of_thread)::const_reference thread_state) {
-
-      static_assert(std::is_same<decltype(std::get<1>(thread_state)), const tracing_state_t&>::value, "type conflict");
-
-      return (std::get<1>(thread_state) == SELECTIVE_SUSPENDED);
+      return (std::get<1>(thread_state) != FULL_SUSPENDED);
   });
 
   if (new_state != some_thread_is_not_suspended) {
@@ -228,14 +218,6 @@ static auto update_condition (ADDRINT ins_addr, THREADID thread_id) -> void
           state_of_thread[thread_id] = FULL_SUSPENDED;
         }
 
-//        if (std::find(
-//              std::begin(selective_skip_call_addresses), std::end(selective_skip_call_addresses), thread_ins_addr)
-//            != std::end(selective_skip_call_addresses)) {
-
-//          tfm::format(std::cerr, "suspend (selective) thread %d...\n", thread_id);
-//          state_of_thread[thread_id] = SELECTIVE_SUSPENDED;
-//        }
-
         if ((std::get<INS_ADDRESS>(ins_at_thread[thread_id]) == stop_address) && (stop_address != 0x0)) {
           state_of_thread[thread_id] = FULL_SUSPENDED;
         }
@@ -271,7 +253,7 @@ static auto update_condition (ADDRINT ins_addr, THREADID thread_id) -> void
     break;
 
   case SUSPEND_TO_ENABLE:
-    if ((state_of_thread[thread_id] == FULL_SUSPENDED) || (state_of_thread[thread_id] == SELECTIVE_SUSPENDED)) {
+    if (state_of_thread[thread_id] == FULL_SUSPENDED) {
 
       if (ins_addr == resume_address_of_thread[thread_id]) {
         tfm::format(std::cerr, "enable thread %d...\n", thread_id);
@@ -294,16 +276,14 @@ static auto update_condition (ADDRINT ins_addr, THREADID thread_id) -> void
 
 static auto initialize_instruction (ADDRINT ins_addr, THREADID thread_id) -> void
 {
-  if ((state_of_thread[thread_id] == ENABLED) ||
-      ((state_of_thread[thread_id] == SELECTIVE_SUSPENDED) && (cached_ins_at_addr[ins_addr]->is_syscall))) {
+  if (state_of_thread[thread_id] == ENABLED) {
+
     ins_at_thread[thread_id] = dyn_ins_t(ins_addr,          // instruction address
                                          thread_id,         // thread id
                                          dyn_regs_t(),      // read registers
                                          dyn_regs_t(),      // written registers
                                          dyn_mems_t(),      // read memory addresses
-                                         dyn_mems_t()      // write memory addresses
-//                                         concrete_info_t{} // other concrete information
-//                                         0x0                // next instruction address
+                                         dyn_mems_t()       // write memory addresses
                                          );
   }
   return;
@@ -316,8 +296,6 @@ static auto update_resume_address (ADDRINT resume_addr, THREADID thread_id) -> v
 
   if (state_of_thread[thread_id] == ENABLED) {
     resume_address_of_thread[thread_id] = resume_addr;
-
-//    tfm::printfln("resume address = 0x%x", resume_addr);
   }
   return;
 }
@@ -331,8 +309,7 @@ static auto save_register (const CONTEXT* p_context, THREADID thread_id) -> void
     auto ins_addr = std::get<INS_ADDRESS>(ins_at_thread[thread_id]);
     const auto & current_ins = cached_ins_at_addr[ins_addr];
 
-    if (((state_of_thread[thread_id] == ENABLED) && !current_ins->is_special) ||
-        ((state_of_thread[thread_id] == SELECTIVE_SUSPENDED) && current_ins->is_syscall)) {
+    if ((state_of_thread[thread_id] == ENABLED) && !current_ins->is_special) {
 
       const auto & regs = !read_or_write ? current_ins->src_registers : current_ins->dst_registers;
 
@@ -350,13 +327,6 @@ static auto save_register (const CONTEXT* p_context, THREADID thread_id) -> void
   return;
 }
 
-template <typename T>
-auto assign_value (dyn_mems_t& mem_map, ADDRINT addr) -> void
-{
-  mem_map[dyn_mem_t(addr, sizeof(T))] = *(reinterpret_cast<T*>(addr));
-  return;
-}
-
 enum rw_t { READ = 0, WRITE = 1 };
 
 template <rw_t read_or_write>
@@ -364,139 +334,42 @@ static auto save_memory (ADDRINT mem_addr, UINT32 mem_size, THREADID thread_id) 
 {
   static_assert((read_or_write == READ) || (read_or_write == WRITE), "unknown action");
 
-  static auto save_memory_size = std::map<
-      uint8_t, std::function<void (dyn_mems_t&, ADDRINT)>
-      > {
-    {1, assign_value<uint8_t>}, {2, assign_value<uint16_t>},
-    {4, assign_value<uint32_t>}, {8, assign_value<uint64_t>}
-  };
-
   if (ins_at_thread.find(thread_id) != ins_at_thread.end()) {
 
-    if ((state_of_thread[thread_id] == ENABLED) ||
-        ((state_of_thread[thread_id] == SELECTIVE_SUSPENDED) &&
-         cached_ins_at_addr[std::get<INS_ADDRESS>(ins_at_thread[thread_id])]->is_syscall)) {
+    if (state_of_thread[thread_id] == ENABLED) {
 
       // any chance for compile time evaluation !?
       auto& mem_map = (read_or_write == READ) ? std::get<INS_READ_MEMS>(ins_at_thread[thread_id]) :
                                                 std::get<INS_WRITE_MEMS>(ins_at_thread[thread_id]);
 
-      if (mem_size != 0) {
-        ASSERTX((mem_size == 1) || (mem_size == 2) || (mem_size == 4) || (mem_size == 8));
-
-        // some obscure programs use accessing to zero exception to exit
-        if (mem_addr != 0) {
-          if (read_or_write == READ) save_memory_size[mem_size](mem_map, mem_addr);
-          else mem_map[dyn_mem_t(mem_addr, mem_size)] = 0;
+      if (mem_addr != 0) {
+        for (decltype(mem_size) idx = 0; idx < mem_size; ++idx) {
+          mem_map[mem_addr + idx] = *(reinterpret_cast<uint8_t*>(mem_addr + idx));
         }
       }
-      else { // save_memory is called with mem_size == 0
-        ASSERTX((mem_map.size() == 1) || (mem_map.size() == 0));
-        ASSERTX(mem_addr == 0);
 
-        if (mem_map.size() == 1) {
-          ASSERTX(cached_ins_at_addr[std::get<INS_ADDRESS>(ins_at_thread[thread_id])]->is_memory_write);
-
-          auto stored_mem      = std::begin(mem_map);
-          auto mem_addr_size   = std::get<0>(*stored_mem);
-          auto mem_addr        = std::get<0>(mem_addr_size);
-          auto stored_mem_size = std::get<1>(mem_addr_size);
-
-          ASSERTX((stored_mem_size == 1) || (stored_mem_size == 2) ||
-                 (stored_mem_size == 4) || (stored_mem_size == 8));
-
-          ASSERTX(mem_map[dyn_mem_t(mem_addr, stored_mem_size)] == 0);
-
-          save_memory_size[stored_mem_size](mem_map, mem_addr);
-        }
-      }
     }
   }
 
   return;
 }
 
-//static auto save_not_retrieved_concrete_info (THREADID thread_id) noexcept -> void
-//{
-//  if (ins_at_thread.find(thread_id) != ins_at_thread.end()) {
-//    assert(cached_ins_at_addr[std::get<INS_ADDRESS>(ins_at_thread[thread_id])]->is_special);
-
-//    if (state_of_thread[thread_id] == ENABLED) {
-
-//    }
-//  }
-//  return;
-//}
-
-//static auto save_call_concrete_info (ADDRINT called_addr, THREADID thread_id) -> void
-//{
-//  auto get_called_func_name = [](ADDRINT called_addr) -> std::string {
-//    PIN_LockClient();
-//    auto routine = RTN_FindByAddress(called_addr);
-//    PIN_UnlockClient();
-
-//    if (RTN_Valid(routine)) {
-//      auto routine_mangled_name = RTN_Name(routine);
-//      return PIN_UndecorateSymbolName(routine_mangled_name, UNDECORATION_NAME_ONLY);
-//    }
-//    else return "";
-//  };
-
-//  if (ins_at_thread.find(thread_id) != ins_at_thread.end()) {
-//    ASSERTX(cached_ins_at_addr[std::get<INS_ADDRESS>(ins_at_thread[thread_id])]->is_call);
-
-//    if (state_of_thread[thread_id] == ENABLED) {
-//      auto call_info = call_info_t{};
-//      call_info.called_fun_addr = called_addr;
-
-//      if (cached_ins_at_addr.find(called_addr) != cached_ins_at_addr.end()) {
-//        call_info.called_fun_name = cached_ins_at_addr[called_addr]->including_routine_name;
-//      }
-//      else {
-//        call_info.called_fun_name = get_called_func_name(called_addr);
-//      }
-
-//      auto ins_addr = std::get<INS_ADDRESS>(ins_at_thread[thread_id]);
-//      if ((std::find(
-//             std::begin(full_skip_call_addresses), std::end(full_skip_call_addresses), ins_addr
-//             ) != std::end(full_skip_call_addresses)) /*||
-//          (std::find(
-//             std::begin(selective_skip_call_addresses), std::end(selective_skip_call_addresses), ins_addr
-//             ) != std::end(selective_skip_call_addresses))*/) {
-//        call_info.is_traced = false;
-//      }
-//      else {
-//        call_info.is_traced = true;
-//      }
-
-//      std::get<INS_CONCRETE_INFO>(ins_at_thread[thread_id]) = call_info;
-//    }
-//  }
-//  return;
-//}
-
 
 static auto add_to_trace (ADDRINT ins_addr, THREADID thread_id) -> void
 {
   if (ins_at_thread.find(thread_id) != ins_at_thread.end()) {
 
-    if ((state_of_thread[thread_id] == ENABLED) ||
-        ((state_of_thread[thread_id] == SELECTIVE_SUSPENDED) &&
-         cached_ins_at_addr[std::get<INS_ADDRESS>(ins_at_thread[thread_id])]->is_syscall)) {
-
-//      tfm::printfln("0x%-12x %s", ins_addr, cached_ins_at_addr[ins_addr]->disassemble);
-
-//      std::get<INS_NEXT_ADDRESS>(ins_at_thread[thread_id]) = ins_addr;
-//      trace.push_back(ins_at_thread[thread_id]);
-
-//      tfm::printfln("trace length: %d", trace.size());
+    if (state_of_thread[thread_id] == ENABLED) {
 
       if (trace.size() >= 5000) {
         trace_length += trace.size();
+
         if (trace_length >= max_trace_length) {
           tfm::format(std::cerr, "stop tracing since trace limit length %d is exceed\n", max_trace_length);
+
           PIN_ExitApplication(1);
         }
+
         cap_flush_trace();
       }
     }
@@ -800,7 +673,7 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
      * treatment because the read/write memory addresses/registers cannot be determined statically.
      */
 
-    if (some_thread_is_not_suspended || some_thread_is_selective_suspended) {
+    if (some_thread_is_not_suspended) {
       // update information of the PREVIOUS instruction (i.e. write registers, memory addresses)
       if (!current_ins->is_special) {
         save_before_handling(ins);
@@ -810,7 +683,7 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
     /*
      * Add the PREVIOUS instruction into the trace.
      */
-    if (some_thread_is_not_suspended || some_thread_is_selective_suspended) {
+    if (some_thread_is_not_suspended) {
       static_assert(std::is_same<
                     decltype(add_to_trace), VOID (ADDRINT, UINT32)
                     >::value, "invalid callback function type");
@@ -837,17 +710,8 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
 
       auto current_ins_addr = current_ins->address;
 
-      if (/*(std::find(
-            std::begin(selective_skip_call_addresses), std::end(selective_skip_call_addresses), current_ins_addr
-             ) != std::end(selective_skip_call_addresses))
-          ||*/
-          (std::find(
-             std::begin(full_skip_call_addresses), std::end(full_skip_call_addresses), current_ins_addr
-             ) != std::end(full_skip_call_addresses))
-          ) {
-//        ASSERTX((current_ins->is_call || current_ins->is_branch) &&
-//                "the instruction at the skip address must be a call or branch");
-
+      if (std::find(std::begin(full_skip_call_addresses), std::end(full_skip_call_addresses), current_ins_addr)
+          != std::end(full_skip_call_addresses)) {
         static_assert(std::is_same<
                       decltype(update_resume_address), VOID (ADDRINT, UINT32)
                       >::value, "invalid callback function type");
@@ -861,7 +725,7 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
       }
     } // end of if (some_thread_is_not_suspended)
 
-    if (some_thread_is_not_suspended || some_thread_is_selective_suspended) {
+    if (some_thread_is_not_suspended) {
       ins_insert_call<true>(ins,
                      IPOINT_BEFORE,
                      reinterpret_cast<AFUNPTR>(remove_previous_instruction),
@@ -884,15 +748,12 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
                   >::value, "invalid callback function type");
 
     // ATTENTION: cette fonction pourra changer l'instrumentation!!!!
-    // if (current_ins->is_special) {
       ins_insert_call<true>(ins,
                      IPOINT_BEFORE,
                      reinterpret_cast<AFUNPTR>(reinstrument_because_of_suspended_state),
                      IARG_CONST_CONTEXT,
                      IARG_INST_PTR,
                      IARG_END);
-    // }
-
 
     /*
      * The function ABOVE will update the suspended state (which is true if there is some non-suspended thread, and
@@ -902,7 +763,7 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
      * following function will capture information of the current instruction.
      */
 
-    if (some_thread_is_not_suspended || some_thread_is_selective_suspended) {
+    if (some_thread_is_not_suspended) {
 
       // initialize and save information of the CURRENT instruction
 
@@ -919,27 +780,13 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
 
 #if defined(FAST_TRACING)
 #else
-//      if (current_ins->is_call) {
-
-//        static_assert(std::is_same<
-//                      decltype(save_call_concrete_info), VOID (ADDRINT, UINT32)
-//                      >::value, "invalid callback function type");
-
-//        ins_insert_call<true>(ins,
-//                       IPOINT_BEFORE,
-//                       reinterpret_cast<AFUNPTR>(save_call_concrete_info),
-//                       IARG_BRANCH_TARGET_ADDR,
-//                       IARG_THREAD_ID,
-//                       IARG_END);
-//      }
-
       if (!current_ins->src_registers.empty() && !current_ins->is_special) {
 
         static_assert(std::is_same<
                       decltype(save_register<READ>), VOID (const CONTEXT*, UINT32)
                       >::value, "invalid callback function type");
 
-        ins_insert_call<true>(ins,                                             // instrumented instruction
+        ins_insert_call<true>(ins,                                      // instrumented instruction
                        IPOINT_BEFORE,                                   // instrumentation point
                        reinterpret_cast<AFUNPTR>(save_register<READ>),  // callback analysis function
                        IARG_CONST_CONTEXT,                              // context of CPU,
@@ -953,7 +800,7 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
                       decltype(save_memory<READ>), VOID (ADDRINT, UINT32, UINT32)
                       >::value, "invalid callback function type");
 
-        ins_insert_call<true>(ins,                                             // instrumented instruction
+        ins_insert_call<true>(ins,                                      // instrumented instruction
                        IPOINT_BEFORE,                                   // instrumentation point
                        reinterpret_cast<AFUNPTR>(save_memory<READ>),    // callback analysis function (read)
                        IARG_MEMORYREAD_EA, IARG_MEMORYREAD_SIZE,        // memory read (address, size)
@@ -963,7 +810,7 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
 
       if (current_ins->has_memory_read_2 && !current_ins->is_special) {
 
-        ins_insert_call<true>(ins,                                             // instrumented instruction
+        ins_insert_call<true>(ins,                                      // instrumented instruction
                        IPOINT_BEFORE,                                   // instrumentation point
                        reinterpret_cast<AFUNPTR>(save_memory<READ>),    // callback analysis function (read)
                        IARG_MEMORYREAD2_EA, IARG_MEMORYREAD_SIZE,       // memory read (address, size)
@@ -973,7 +820,7 @@ static auto insert_ins_get_info_callbacks (INS ins) -> void
 
       if (current_ins->is_memory_write && !current_ins->is_special) {
 
-        ins_insert_call<true>(ins,                                             // instrumented instruction
+        ins_insert_call<true>(ins,                                      // instrumented instruction
                        IPOINT_BEFORE,                                   // instrumentation point
                        reinterpret_cast<AFUNPTR>(save_memory<WRITE>),   // callback analysis function (write)
                        IARG_MEMORYWRITE_EA, IARG_MEMORYWRITE_SIZE,      // memory written (address, size)
@@ -1178,38 +1025,10 @@ static auto insert_ins_patch_info_callbacks (INS ins) -> void
       }
     }
 
-//    register_is_patchable = std::any_of(patched_register_at_address.begin(), patched_register_at_address.end(),
-//                                     [&](decltype(patched_register_at_address)::const_reference patch_reg_info)
-//    {
-//      auto patch_exec_point = std::get<0>(patch_reg_info);
-//      auto exec_point       = std::get<0>(patch_exec_point);
-//      auto exec_addr        = std::get<0>(exec_point);
-//      auto exec_order       = std::get<1>(exec_point);
-
-//      return (exec_order >= execution_order_of_address[exec_addr]);
-//    });
     register_is_patchable = point_is_patchable<decltype(patched_register_at_address)>(patched_register_at_address);
 
-//    memory_is_patchable = std::any_of(patched_memory_at_address.begin(), patched_memory_at_address.end(),
-//                                   [&](decltype(patched_memory_at_address)::const_reference patch_mem_info)
-//    {
-//      auto patch_exec_point = std::get<0>(patch_mem_info);
-//      auto exec_point       = std::get<0>(patch_exec_point);
-//      auto exec_addr        = std::get<0>(exec_point);
-//      auto exec_order       = std::get<1>(exec_point);
-
-//      return (exec_order >= execution_order_of_address[exec_addr]);
-//    });
     memory_is_patchable = point_is_patchable<decltype(patched_memory_at_address)>(patched_memory_at_address);
 
-//    indirect_memory_is_patchable = std::any_of(patched_indirect_memory_at_address.begin(),
-//                                               patched_indirect_memory_at_address.end(),
-//                                               [&](decltype(patched_indirect_memory_at_address)::const_reference patch_indirect_mem_info)
-//    {
-//      auto patch_exec_point = std::get<0>(patch_indirect_mem_info);
-//      auto exec_point = std::get<0>(patch_exec_point);
-//      auto exec_addr = std::get<>
-//    });
     indirect_memory_is_patchable = point_is_patchable<decltype(patched_indirect_memory_at_address)>(patched_indirect_memory_at_address);
   }
   return;
@@ -1332,45 +1151,6 @@ static auto img_mode_get_ins_info (IMG img, VOID* data) -> VOID
                       ins_addr, cached_ins_at_addr[ins_addr]->disassemble, called_addr);
           full_skip_call_addresses.push_back(ins_addr);
         }
-
-//        if (INS_IsDirectCall(ins) &&
-//            (std::find(
-//               std::begin(full_skip_call_addresses), std::end(full_skip_call_addresses), ins_addr
-//               ) == std::end(full_skip_call_addresses)
-//             )) {
-//          auto called_addr = INS_DirectBranchOrCallTargetAddress(ins);
-
-//          if (std::find(
-//                std::begin(auto_skip_call_addresses), std::end(auto_skip_call_addresses), called_addr
-//                ) != std::end(auto_skip_call_addresses)) {
-//            tfm::format(std::cerr, "add a full-skip from an auto-skip at 0x%x  %s\n",
-//                        ins_addr, cached_ins_at_addr[ins_addr]->disassemble);
-//            full_skip_call_addresses.push_back(ins_addr);
-//          }
-//        }
-
-
-//        // update the code cache if a new instruction found.
-//        if (cached_ins_at_addr.find(ins_addr) == cached_ins_at_addr.end()) {
-
-//          cached_ins_at_addr[ins_addr] = std::make_shared<instruction>(ins);
-
-//          if (INS_IsDirectCall(ins) &&
-//              (std::find(
-//                 std::begin(full_skip_call_addresses), std::end(full_skip_call_addresses), ins_addr
-//                 ) == std::end(full_skip_call_addresses)
-//               )) {
-//            auto called_addr = INS_DirectBranchOrCallTargetAddress(ins);
-
-//            if (std::find(
-//                  std::begin(auto_skip_call_addresses), std::end(auto_skip_call_addresses), called_addr
-//                  ) != std::end(auto_skip_call_addresses)) {
-//              tfm::format(std::cerr, "add a full-skip from an auto-skip at 0x%x  %s\n",
-//                          ins_addr, cached_ins_at_addr[ins_addr]->disassemble);
-//              full_skip_call_addresses.push_back(ins_addr);
-//            }
-//          }
-//        }
       }
       RTN_Close(rtn);
     }
@@ -1397,8 +1177,6 @@ auto cap_initialize_state () -> void
   some_thread_is_started = (start_address == 0x0);
 
   some_thread_is_not_suspended = true;
-  some_thread_is_selective_suspended = false;
-
   return;
 }
 
