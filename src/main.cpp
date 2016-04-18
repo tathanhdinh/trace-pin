@@ -101,13 +101,6 @@ auto load_option_from_file (const std::string& filename) -> void
       tfm::format(std::cerr, "add skip full address: 0x%x\n", opt_skip_full);
     }
 
-//          if (field[0] == "skip-selective") {
-//            auto opt_skip_select = std::stoul(field[1], &unconverted_idx, 16);
-//            cap_add_selective_skip_address(static_cast<ADDRINT>(opt_skip_select));
-
-//            tfm::format(std::cerr, "add skip selective address: 0x%x\n", opt_skip_select);
-//          }
-
     if (field[0] == "skip-auto") {
       auto opt_skip_auto = std::stoul(field[1], &unconverted_idx, 16);
       cap_add_auto_skip_call_addresses(static_cast<ADDRINT>(opt_skip_auto));
@@ -115,7 +108,6 @@ auto load_option_from_file (const std::string& filename) -> void
       tfm::format(std::cerr, "add skip auto address: 0x%x\n", opt_skip_auto);
     }
   }
-//  }
 
   return;
 }
