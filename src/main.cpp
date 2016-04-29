@@ -5,6 +5,8 @@
 #include "tracing/instruction.h"
 #include "tracing/export.h"
 
+#include "json.hpp"
+
 #include <fstream>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
@@ -27,7 +29,7 @@ static KNOB<ADDRINT> stop_address_knob           (KNOB_MODE_WRITEONCE, "pintool"
 
 static KNOB<ADDRINT> skip_full_address_knob      (KNOB_MODE_APPEND, "pintool", "skip-full", "0x0", "skipping call address");
 
-static KNOB<ADDRINT> skip_selective_address_knob (KNOB_MODE_APPEND, "pintool", "skip-selective", "0x0", "skipping call address but select syscalls");
+//static KNOB<ADDRINT> skip_selective_address_knob (KNOB_MODE_APPEND, "pintool", "skip-selective", "0x0", "skipping call address but select syscalls");
 
 static KNOB<ADDRINT> skip_auto_address_knob      (KNOB_MODE_APPEND, "pintool", "skip-auto", "0x0", "skipping called address");
 
@@ -37,11 +39,25 @@ static KNOB<string> config_file                  (KNOB_MODE_WRITEONCE, "pintool"
 
 static KNOB<string> output_file                  (KNOB_MODE_WRITEONCE, "pintool", "out", "", "output file, for resulted trace");
 
-static KNOB<string> option_file                  (KNOB_MODE_WRITEONCE, "pintool", "opt", "", "option file, for parameter");
+//static KNOB<string> option_file                  (KNOB_MODE_WRITEONCE, "pintool", "opt", "", "option file, for parameter");
 
 /*====================================================================================================================*/
 /*                                                     support functions                                              */
 /*====================================================================================================================*/
+
+auto parse_configuration (const std::string& filename) -> void
+{
+  std::ifstream config_file(filename.c_str(), std::ifstream::in);
+  if (!config_file.is_open()) {
+    tfm::printfln("cannot open configuration file");
+    std::terminate();
+  }
+
+  nlohmann::json config_json;
+  config_file >> config_json;
+
+  return;
+}
 
 auto get_reg_from_name (const std::string& reg_name) -> REG
 {
@@ -213,16 +229,11 @@ auto load_configuration_and_options (int argc, char* argv[]) -> void
     cap_add_full_skip_call_address(skip_full_address_knob.Value(i));
   }
 
-//  for (uint32_t i = 0; i < skip_selective_address_knob.NumberOfValues(); ++i) {
-//    cap_add_selective_skip_address(skip_selective_address_knob.Value(i));
-//  }
-
   for (uint32_t i = 0; i < skip_auto_address_knob.NumberOfValues(); ++i) {
     cap_add_auto_skip_call_addresses(skip_auto_address_knob.Value(i));
   }
 
   auto app_name = get_application_name(argc, argv);
-//  app_name = "result_default";
 
   auto config_filename = config_file.Value();
   if (config_filename.empty()) {
@@ -259,7 +270,7 @@ auto load_configuration_and_options (int argc, char* argv[]) -> void
 
 auto stop_pin (INT32 code, VOID* data) -> VOID
 {
-  (void)code; (void)data;
+  static_cast<void>(code); static_cast<void>(data);
 
   tfm::format(std::cerr, "save trace...\n");
   cap_flush_trace();
@@ -270,7 +281,7 @@ auto stop_pin (INT32 code, VOID* data) -> VOID
 
 auto detach_pin (VOID* data) -> VOID
 {
-  (void)data;
+  static_cast<void>(data);
 
   tfm::format(std::cerr, "save trace...\n");
   cap_flush_trace();

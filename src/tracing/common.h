@@ -22,7 +22,7 @@ using dyn_ins_t = std::tuple<
   dyn_regs_t,     // read registers
   dyn_regs_t,     // write registers
   dyn_mems_t,     // read memory addresses
-  dyn_mems_t     // write memory addresses
+  dyn_mems_t      // write memory addresses
   >;
 
 // list is prefered since new instructions will be added regularly
