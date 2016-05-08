@@ -9,8 +9,12 @@
 #include <fstream>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
-#include <algorithm>
+
 #include <regex>
+
+#include <algorithm>
+#include <exception>
+#include <type_traits>
 
 #define PIN_INIT_FAILED 1
 #define UNUSED_DATA 0
@@ -21,10 +25,6 @@
 
 
 static KNOB<uint32_t> trace_length_knob          (KNOB_MODE_WRITEONCE, "pintool", "length", "10000", "length of trace");
-
-static KNOB<ADDRINT> start_address_knob          (KNOB_MODE_WRITEONCE, "pintool", "start", "0x0", "tracing start address");
-
-static KNOB<ADDRINT> stop_address_knob           (KNOB_MODE_WRITEONCE, "pintool", "stop", "0x0", "tracing stop address");
 
 static KNOB<ADDRINT> skip_full_address_knob      (KNOB_MODE_APPEND, "pintool", "skip-full", "0x0", "skipping call address");
 
@@ -41,91 +41,72 @@ static KNOB<string> output_file                  (KNOB_MODE_WRITEONCE, "pintool"
 /*                                                     support functions                                              */
 /*====================================================================================================================*/
 
-auto parse_configuration (const std::string& filename) -> void
+auto get_pin_register_from_name (const std::string& reg_name) -> REG
 {
-  std::ifstream config_file(filename.c_str(), std::ifstream::in);
-  if (!config_file.is_open()) {
-    tfm::printfln("cannot open configuration file");
-    std::terminate();
-  }
+  auto upper_reg_name = std::string(reg_name);
+  std::transform(std::begin(upper_reg_name), std::end(upper_reg_name), std::begin(upper_reg_name),
+                 [](unsigned char c) { return std::toupper(c); });
 
-  nlohmann::json config_json;
-  config_file >> config_json;
-
-  auto json_start_address = ADDRINT{config_json["start"]};
-  auto json_stop_address = ADDRINT{config_json["stop"]};
-
-  pintool_set_start_address(json_start_address);
-  pintool_set_stop_address(json_stop_address);
-
-  auto json_skips = std::vector<nlohmann::json>{config_json["skips"]};
-
-  return;
-}
-
-auto get_reg_from_name (const std::string& reg_name) -> REG
-{
-  auto upper_reg_name = boost::to_upper_copy(reg_name);
   std::underlying_type<REG>::type reg_id;
   for (reg_id = REG_INVALID_ ; reg_id < REG_LAST; ++reg_id) {
-    if (boost::to_upper_copy(REG_StringShort(static_cast<REG>(reg_id))) == upper_reg_name) {
-      break;
-    }
+    auto pin_reg_name = REG_StringShort(static_cast<REG>(reg_id));
+    if (pin_reg_name == upper_reg_name) break;
   }
+
   return static_cast<REG>(reg_id);
 }
 
-
-auto load_option_from_file (const std::string& filename) -> void
+auto parse_configuration (const std::string& filename) -> void
 {
-  std::ifstream opt_file(filename.c_str(), std::ifstream::in);
-  if (!opt_file.is_open()) {
-    tfm::printfln("cannot open option file: %s", filename);
-    return;
+  std::ifstream config_file(filename.c_str(), std::ifstream::in);
+  if (!config_file.is_open()) throw std::logic_error("cannot open configuration file");
+
+  nlohmann::json config_json; config_file >> config_json;
+
+  // parse "start/stop" addresses
+  std::string start_address_str = config_json["start"];
+  auto start_address = static_cast<ADDRINT>(std::stoul(start_address_str, 0, 0));
+
+  std::string stop_address_str = config_json["stop"];
+  auto stop_address = static_cast<ADDRINT>(std::stoul(stop_address_str, 0, 0));
+
+  pintool_set_start_address(start_address);
+  pintool_set_stop_address(stop_address);
+
+  // parse "skip" entries
+  auto skip_entries = std::vector<nlohmann::json>{config_json["skip"]};
+  for (const auto& skip_elem : skip_entries) {
+    std::string skip_type = skip_elem["type"];
+
+    auto skip_address = ADDRINT{skip_elem["address"]};
+
+    if (skip_type == "caller") pintool_add_caller_skip_address(skip_address);
+    else if (skip_type == "callee") pintool_add_callee_skip_addresses(skip_address);
+    else throw std::logic_error("type of skip must be either \"caller\" or \"callee\"");
   }
 
-  auto line = std::string();
-  while (std::getline(opt_file, line)) {
-    line = boost::trim_copy(line);
-    if (line.front() == '#') continue; // omit commented file
+  // parse "modify" entries
+  auto modify_entries = std::vector<nlohmann::json>{config_json["modify"]};
+  for (const auto& modify_elem : modify_entries) {
+    std::string location_address_str = modify_elem["location"]["address"];
+    auto location_address = static_cast<ADDRINT>(std::stoul(location_address_str, 0, 0));
 
-    auto field = std::vector<std::string>();
-    boost::split(field, line, boost::is_any_of(","), boost::token_compress_on);
+    std::string location_position_str = modify_elem["location"]["position"];
+    auto location_position = bool{false};
+    if (location_position_str == "before") location_position = false;
+    else if (location_position_str == "after") location_position = true;
+    else throw std::logic_error("position of modification must be either \"before\" or \"after\"");
 
+    nlohmann::json target_entries = modify_elem["targets"];
+    for (const auto& target_elem : target_entries) {
+      std::string target_type_str = target_elem["type"];
+      if (target_type_str == "register") {
+        std::string target_register_str = target_elem["name"];
+        auto pin_reg = get_pin_register_from_name(target_register_str);
 
-    if (field.size() < 2) {
-      tfm::printfln("malformed string");
-      continue;
-    }
-
-//    if (field.size() == 2) {
-    auto unconverted_idx = std::size_t{0};
-    if (field[0] == "start") {
-      auto opt_start = std::stoul(field[1], &unconverted_idx, 0);
-      pintool_set_start_address(static_cast<ADDRINT>(opt_start));
-
-      tfm::format(std::cerr, "add start address: 0x%x\n", opt_start);
-    }
-
-    if (field[0] == "stop") {
-      auto opt_stop = std::stoul(field[1], &unconverted_idx, 0);
-      pintool_set_stop_address(static_cast<ADDRINT>(opt_stop));
-
-      tfm::format(std::cerr, "add stop address: 0x%x\n", opt_stop);
-    }
-
-    if (field[0] == "skip-full") {
-      auto opt_skip_full = std::stoul(field[1], &unconverted_idx, 16);
-      cap_add_full_skip_call_address(static_cast<ADDRINT>(opt_skip_full));
-
-      tfm::format(std::cerr, "add skip full address: 0x%x\n", opt_skip_full);
-    }
-
-    if (field[0] == "skip-auto") {
-      auto opt_skip_auto = std::stoul(field[1], &unconverted_idx, 16);
-      cap_add_auto_skip_call_addresses(static_cast<ADDRINT>(opt_skip_auto));
-
-      tfm::format(std::cerr, "add skip auto address: 0x%x\n", opt_skip_auto);
+        std::string target_value_str = target_elem["value"];
+        auto target_value = static_cast<ADDRINT>(std::stoul(target_value_str, 0, 0));
+      }
     }
   }
 
@@ -171,7 +152,7 @@ auto load_configuration_from_file (const std::string& filename) -> void
 
         if (std::regex_match(patch_location_str, std::regex("^\\[.+\\]$"))) { // (2)
           auto reg_name = fields[2].substr(1, patch_location_str.size() - 2);
-          auto reg = get_reg_from_name(reg_name);
+          auto reg = get_pin_register_from_name(reg_name);
 
           cap_add_patched_indirect_memory_value(ins_addr, exec_order, patch_point, reg, mem_size, patched_value);
 
@@ -196,7 +177,7 @@ auto load_configuration_from_file (const std::string& filename) -> void
         boost::split(reg_lo_hi_pos_strs, fields[2], boost::is_any_of(":"), boost::token_compress_on);
         auto reg_name = reg_lo_hi_pos_strs[0];
 
-        auto reg = get_reg_from_name(reg_name);
+        auto reg = get_pin_register_from_name(reg_name);
           auto low_bit_pos = static_cast<UINT8>(std::stoul(reg_lo_hi_pos_strs[1]));
           auto high_bit_pos = static_cast<UINT8>(std::stoul(reg_lo_hi_pos_strs[2]));
 
@@ -225,16 +206,12 @@ auto load_configuration_and_options (int argc, char* argv[]) -> void
   // initialize trace file, code cache, set start/stop addresses to 0x0
   cap_initialize();
 
-  // get start/stop addresses from command line (default is 0x0)
-  pintool_set_start_address(start_address_knob.Value());
-  pintool_set_stop_address(stop_address_knob.Value());
-
   for (uint32_t i = 0; i < skip_full_address_knob.NumberOfValues(); ++i) {
-    cap_add_full_skip_call_address(skip_full_address_knob.Value(i));
+    pintool_add_caller_skip_address(skip_full_address_knob.Value(i));
   }
 
   for (uint32_t i = 0; i < skip_auto_address_knob.NumberOfValues(); ++i) {
-    cap_add_auto_skip_call_addresses(skip_auto_address_knob.Value(i));
+    pintool_add_callee_skip_addresses(skip_auto_address_knob.Value(i));
   }
 
   auto app_name = get_application_name(argc, argv);

@@ -1188,14 +1188,14 @@ auto pintool_set_stop_address (ADDRINT address) -> void
 }
 
 
-auto cap_add_full_skip_call_address (ADDRINT address) -> void
+auto pintool_add_caller_skip_address (ADDRINT address) -> void
 {
   full_skip_call_addresses.push_back(address);
   return;
 }
 
 
-auto cap_add_auto_skip_call_addresses (ADDRINT address) -> void
+auto pintool_add_callee_skip_addresses (ADDRINT address) -> void
 {
   auto_skip_call_addresses.push_back(address);
   return;
