@@ -1,4 +1,3 @@
-//#include "parsing_helper.h"
 #include <pin.H>
 
 #include "tracing/tinyformat.h"
@@ -29,8 +28,6 @@ static KNOB<ADDRINT> stop_address_knob           (KNOB_MODE_WRITEONCE, "pintool"
 
 static KNOB<ADDRINT> skip_full_address_knob      (KNOB_MODE_APPEND, "pintool", "skip-full", "0x0", "skipping call address");
 
-//static KNOB<ADDRINT> skip_selective_address_knob (KNOB_MODE_APPEND, "pintool", "skip-selective", "0x0", "skipping call address but select syscalls");
-
 static KNOB<ADDRINT> skip_auto_address_knob      (KNOB_MODE_APPEND, "pintool", "skip-auto", "0x0", "skipping called address");
 
 static KNOB<UINT32> loop_count_knob              (KNOB_MODE_WRITEONCE, "pintool", "loop-count", "1", "loop count");
@@ -39,7 +36,6 @@ static KNOB<string> config_file                  (KNOB_MODE_WRITEONCE, "pintool"
 
 static KNOB<string> output_file                  (KNOB_MODE_WRITEONCE, "pintool", "out", "", "output file, for resulted trace");
 
-//static KNOB<string> option_file                  (KNOB_MODE_WRITEONCE, "pintool", "opt", "", "option file, for parameter");
 
 /*====================================================================================================================*/
 /*                                                     support functions                                              */
@@ -55,6 +51,14 @@ auto parse_configuration (const std::string& filename) -> void
 
   nlohmann::json config_json;
   config_file >> config_json;
+
+  auto json_start_address = ADDRINT{config_json["start"]};
+  auto json_stop_address = ADDRINT{config_json["stop"]};
+
+  pintool_set_start_address(json_start_address);
+  pintool_set_stop_address(json_stop_address);
+
+  auto json_skips = std::vector<nlohmann::json>{config_json["skips"]};
 
   return;
 }
@@ -98,14 +102,14 @@ auto load_option_from_file (const std::string& filename) -> void
     auto unconverted_idx = std::size_t{0};
     if (field[0] == "start") {
       auto opt_start = std::stoul(field[1], &unconverted_idx, 0);
-      cap_set_start_address(static_cast<ADDRINT>(opt_start));
+      pintool_set_start_address(static_cast<ADDRINT>(opt_start));
 
       tfm::format(std::cerr, "add start address: 0x%x\n", opt_start);
     }
 
     if (field[0] == "stop") {
       auto opt_stop = std::stoul(field[1], &unconverted_idx, 0);
-      cap_set_stop_address(static_cast<ADDRINT>(opt_stop));
+      pintool_set_stop_address(static_cast<ADDRINT>(opt_stop));
 
       tfm::format(std::cerr, "add stop address: 0x%x\n", opt_stop);
     }
@@ -222,8 +226,8 @@ auto load_configuration_and_options (int argc, char* argv[]) -> void
   cap_initialize();
 
   // get start/stop addresses from command line (default is 0x0)
-  cap_set_start_address(start_address_knob.Value());
-  cap_set_stop_address(stop_address_knob.Value());
+  pintool_set_start_address(start_address_knob.Value());
+  pintool_set_stop_address(stop_address_knob.Value());
 
   for (uint32_t i = 0; i < skip_full_address_knob.NumberOfValues(); ++i) {
     cap_add_full_skip_call_address(skip_full_address_knob.Value(i));

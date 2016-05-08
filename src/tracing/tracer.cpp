@@ -1174,14 +1174,14 @@ auto cap_initialize_state () -> void
 }
 
 
-auto cap_set_start_address (ADDRINT address) -> void
+auto pintool_set_start_address (ADDRINT address) -> void
 {
   start_address = address;
   return;
 }
 
 
-auto cap_set_stop_address (ADDRINT address) -> void
+auto pintool_set_stop_address (ADDRINT address) -> void
 {
   stop_address = address;
   return;

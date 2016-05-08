@@ -22,8 +22,8 @@ enum architecture_t
 message address_t
 {
   oneof value {
-    sint32 value_32 = 1;
-    sint64 value_64 = 2;
+    uint32 value_32 = 1;
+    uint64 value_64 = 2;
   }
 }
 
@@ -38,7 +38,7 @@ message register_t
 message memory_t
 {
   address_t address = 1;
-  sint32 value       = 2;
+  uint32 value      = 2;
 }
 
 /* concrete_info = read_reg | write_reg | load_mem | store_mem */
@@ -55,7 +55,7 @@ message concrete_info_t
 /* instruction = (thread_id, address, opcode, disassemble, c_info*) */
 message instruction_t
 {
-  int32 thread_id                 = 1;
+  uint32 thread_id                = 1;
   address_t address               = 2;
   bytes opcode                    = 3;
   string disassemble              = 4;

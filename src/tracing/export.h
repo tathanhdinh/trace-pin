@@ -9,8 +9,8 @@
 auto cap_initialize                         ()                                                       -> void;
 auto cap_initialize_state                   ()                                                       -> void;
 auto cap_set_trace_length                   (uint32_t trace_length)                                  -> void;
-auto cap_set_start_address                  (ADDRINT address)                                        -> void;
-auto cap_set_stop_address                   (ADDRINT address)                                        -> void;
+auto pintool_set_start_address                  (ADDRINT address)                                        -> void;
+auto pintool_set_stop_address                   (ADDRINT address)                                        -> void;
 auto cap_add_full_skip_call_address         (ADDRINT address)                                        -> void;
 auto cap_add_auto_skip_call_addresses       (ADDRINT address)                                        -> void;
 auto cap_set_loop_count                     (uint32_t count)                                         -> void;
