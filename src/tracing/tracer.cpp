@@ -1132,7 +1132,7 @@ static auto img_mode_get_ins_info (IMG img, VOID* data) -> VOID
 }
 
 
-auto initialize_pintool_state () -> void
+auto pintool_initialize_state () -> void
 {
   cached_instruction_at_address.clear();
   resume_address_of_thread.clear();

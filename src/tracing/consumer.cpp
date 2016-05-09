@@ -1,4 +1,3 @@
-//#include "../../parsing_helper.h"
 #include "export.h"
 #include "common.h"
 
@@ -48,22 +47,21 @@ static auto set_trace_header () -> void
   switch (sizeof(ADDRINT)) {
   case 4:
     trace_header.set_architecture(trace_format::X86);
-    trace_header.set_address_size(trace_format::BIT32);
     break;
 
   case 8:
     trace_header.set_architecture(trace_format::X86_64);
-    trace_header.set_address_size(trace_format::BIT64);
     break;
   }
 
-
+  // get header size and declare a buffer to serialize
   auto header_size = trace_header.ByteSize();
   auto header_buffer = std::shared_ptr<char>(new char[header_size], std::default_delete<char[]>());
 
+  // serialize header to the buffer
   trace_header.SerializeToArray(header_buffer.get(), header_size);
 
-  // save the length of the header and then the buffer containing header
+  // save the length of the header and the buffer
   protobuf_trace_file.write(reinterpret_cast<const char*>(&header_size), sizeof(decltype(header_size)));
   protobuf_trace_file.write(header_buffer.get(), header_size);
 
@@ -74,45 +72,110 @@ static auto set_trace_header () -> void
 }
 
 
-static auto add_trace_instruction (trace_format::chunk_t& chunk, const dyn_ins_t& ins) -> void
+enum REG_RW_T { REG_READ = 0, REG_WRITE = 1 };
+auto add_registers_into_protobuf_instruction(dyn_ins_t& ins, const instruction& static_ins,
+                                             trace_format::instruction_t* p_proto_ins, REG_RW_T reg_type) -> void
+{
+  const auto& regs = (reg_type == REG_READ) ? static_ins.src_registers : static_ins.dst_registers;
+  auto& reg_value_map = (reg_type == REG_READ) ? std::get<INS_READ_REGS>(ins) : std::get<INS_WRITE_REGS>(ins);
+
+  for (const auto& pin_reg : regs) {
+    auto p_new_concrete_info = p_proto_ins->add_c_info();
+    auto p_reg_info = (reg_type == REG_READ) ? p_new_concrete_info->mutable_read_register() : p_new_concrete_info->mutable_write_register();
+
+    p_reg_info->set_name(REG_StringShort(pin_reg));
+    switch (sizeof(ADDRINT)) {
+    case 4:
+      (p_reg_info->mutable_value())->set_value_32(reg_value_map[pin_reg].dword[0]);
+      break;
+
+    case 8:
+      (p_reg_info->mutable_value())->set_value_64(reg_value_map[pin_reg].qword[0]);
+      break;
+    }
+  }
+
+  return;
+}
+
+
+enum MEM_RW_T { MEM_READ = 0, MEM_WRITE = 1 };
+auto add_memories_into_protobuf_instruction (dyn_ins_t& ins, const instruction& static_ins,
+                                             trace_format::instruction_t* p_proto_ins, MEM_RW_T mem_type) -> void
+{
+  const auto&
+  return;
+}
+
+static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, const dyn_ins_t& ins) -> void
 {
   auto ins_address = std::get<INS_ADDRESS>(ins);
   auto p_static_ins = cached_instruction_at_address[ins_address];
 
-  // add a new body as an instruction
-  auto p_ins_body = chunk.add_body();
-  p_ins_body->set_typeid_(trace_format::INSTRUCTION);
-  p_ins_body->clear_metadata();
+  // add new instruction
+  auto p_new_ins = chunk.add_instructions();
 
-  // create an instruction for this body, and set some information
-  auto p_instruction = p_ins_body->mutable_instruction();
-  p_instruction->set_thread_id(std::get<INS_THREAD_ID>(ins));
+  // fill thread_id
+  p_new_ins->set_thread_id(std::get<INS_THREAD_ID>(ins));
 
-  auto opc_size = p_static_ins->opcode_size;
-  auto opc_buffer = std::shared_ptr<uint8_t>(new uint8_t[opc_size], std::default_delete<uint8_t[]>());
-
-  PIN_SafeCopy(opc_buffer.get(), reinterpret_cast<const VOID*>(ins_address), opc_size);
-  p_instruction->set_opcode(opc_buffer.get(), p_static_ins->opcode_size);
-
-  auto p_ins_addr = p_instruction->mutable_address();
-
-  static_assert(((sizeof(ADDRINT) == 4) || (sizeof(ADDRINT) == 8)), "address size must be 32 or 64 bit");
-
+  // fill address
+  auto p_ins_addr = p_new_ins->mutable_address();
   switch (sizeof(ADDRINT)) {
   case 4:
-    p_ins_addr->set_typeid_(trace_format::BIT32);
     p_ins_addr->set_value_32(ins_address);
-    p_ins_addr->clear_value_64();
     break;
 
   case 8:
-    p_ins_addr->set_typeid_(trace_format::BIT64);
     p_ins_addr->set_value_64(ins_address);
-    p_ins_addr->clear_value_32();
     break;
   }
 
-  p_instruction->set_disassemble(p_static_ins->disassemble);
+  // fill opcode
+  auto opcode_size = p_static_ins->opcode_size;
+  auto opcode_buffer = std::shared_ptr<uint8_t>(new uint8_t[opcode_size], std::default_delete<uint8_t[]>());
+  PIN_SafeCopy(opcode_buffer.get(), reinterpret_cast<const VOID*>(ins_address), opcode_size);
+  p_new_ins->set_opcode(opcode_buffer.get(), opcode_size);
+
+  // fill disassemble
+  p_new_ins->set_disassemble(p_static_ins->disassemble);
+
+  //
+
+
+//  // add a new body as an instruction
+//  auto p_ins_body = chunk.add_body();
+//  p_ins_body->set_typeid_(trace_format::INSTRUCTION);
+//  p_ins_body->clear_metadata();
+
+//  // create an instruction for this body, and set some information
+//  auto p_instruction = p_ins_body->mutable_instruction();
+//  p_instruction->set_thread_id(std::get<INS_THREAD_ID>(ins));
+
+//  auto opc_size = p_static_ins->opcode_size;
+//  auto opc_buffer = std::shared_ptr<uint8_t>(new uint8_t[opc_size], std::default_delete<uint8_t[]>());
+
+//  PIN_SafeCopy(opc_buffer.get(), reinterpret_cast<const VOID*>(ins_address), opc_size);
+//  p_instruction->set_opcode(opc_buffer.get(), p_static_ins->opcode_size);
+
+//  auto p_ins_addr = p_instruction->mutable_address();
+
+//  static_assert(((sizeof(ADDRINT) == 4) || (sizeof(ADDRINT) == 8)), "address size must be 32 or 64 bit");
+
+//  switch (sizeof(ADDRINT)) {
+//  case 4:
+//    p_ins_addr->set_typeid_(trace_format::BIT32);
+//    p_ins_addr->set_value_32(ins_address);
+//    p_ins_addr->clear_value_64();
+//    break;
+
+//  case 8:
+//    p_ins_addr->set_typeid_(trace_format::BIT64);
+//    p_ins_addr->set_value_64(ins_address);
+//    p_ins_addr->clear_value_32();
+//    break;
+//  }
+
+//  p_instruction->set_disassemble(p_static_ins->disassemble);
 
   enum REG_T { REG_READ = 0, REG_WRITE = 1 };
   auto add_registers = [&p_instruction, &ins, &p_static_ins](REG_T reg_type) -> void
@@ -243,7 +306,7 @@ auto flush_trace_in_protobuf_format () -> void
 
     // add instructions
     for (const auto& ins : trace) {
-      add_trace_instruction(protobuf_chunk, ins);
+      add_instruction_into_chunk(protobuf_chunk, ins);
     }
 
     auto chunk_size = protobuf_chunk.ByteSize();

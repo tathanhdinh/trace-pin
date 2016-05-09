@@ -158,7 +158,7 @@ auto load_configuration_and_options (int argc, char* argv[]) -> void
   parse_configuration(config_filename);
 
   // initialize trace file, code cache, set start/stop addresses to 0x0
-  initialize_pintool_state();
+  pintool_initialize_state();
 
   auto output_filename = output_file.Value();
   if (output_filename.empty()) {

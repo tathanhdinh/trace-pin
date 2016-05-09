@@ -5,7 +5,7 @@
 #include <pin.H>
 
 // support functions
-auto initialize_pintool_state () -> void;
+auto pintool_initialize_state () -> void;
 
 auto pintool_set_trace_limit_length (uint32_t trace_length) -> void;
 
