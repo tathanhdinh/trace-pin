@@ -74,7 +74,6 @@ static auto current_trace_length = uint32_t{0};
 
 static auto modified_register_at_address        = std::vector<patch_point_register_t>();
 static auto modified_memory_at_address          = std::vector<patch_point_memory_t>();
-//static auto patched_indirect_memory_at_address = std::vector<patch_point_indirect_memory_t>();
 static auto execution_order_of_instruction_at_address = std::map<ADDRINT, UINT32>();
 
 static auto some_thread_is_started             = false;
