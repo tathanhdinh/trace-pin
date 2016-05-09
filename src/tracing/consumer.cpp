@@ -100,10 +100,10 @@ auto add_registers_into_protobuf_instruction(dyn_ins_t& ins, const instruction& 
 
 
 enum MEM_RW_T { MEM_READ = 0, MEM_WRITE = 1 };
-auto add_memories_into_protobuf_instruction (dyn_ins_t& ins, const instruction& static_ins,
+auto add_memories_into_protobuf_instruction (dyn_ins_t& ins,
                                              trace_format::instruction_t* p_proto_ins, MEM_RW_T mem_type) -> void
 {
-  const auto&
+  const auto& mems = (mem_type == MEM_READ) ? std::get<INS_LOAD_MEMS>(ins) : std::get<INS_STORE_MEMS>(ins);
   return;
 }
 
@@ -131,10 +131,10 @@ static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, const dyn_
   }
 
   // fill opcode
-  auto opcode_size = p_static_ins->opcode_size;
-  auto opcode_buffer = std::shared_ptr<uint8_t>(new uint8_t[opcode_size], std::default_delete<uint8_t[]>());
-  PIN_SafeCopy(opcode_buffer.get(), reinterpret_cast<const VOID*>(ins_address), opcode_size);
-  p_new_ins->set_opcode(opcode_buffer.get(), opcode_size);
+//  auto opcode_size = p_static_ins->opcode_size;
+//  auto opcode_buffer = std::shared_ptr<uint8_t>(new uint8_t[opcode_size], std::default_delete<uint8_t[]>());
+//  PIN_SafeCopy(opcode_buffer.get(), reinterpret_cast<const VOID*>(ins_address), opcode_size);
+  p_new_ins->set_opcode(p_static_ins->opcode_buffer.get(), p_static_ins->opcode_size);
 
   // fill disassemble
   p_new_ins->set_disassemble(p_static_ins->disassemble);
@@ -232,7 +232,7 @@ static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, const dyn_
   enum MEM_T { MEM_READ = 0, MEM_WRITE = 1 };
   auto add_mems = [&p_instruction, &ins](MEM_T mem_type) -> void
   {
-    auto mems = (mem_type == MEM_READ) ? std::get<INS_READ_MEMS>(ins) : std::get<INS_WRITE_MEMS>(ins);
+    auto mems = (mem_type == MEM_READ) ? std::get<INS_LOAD_MEMS>(ins) : std::get<INS_STORE_MEMS>(ins);
 
     for (auto const& addr_val : mems) {
 

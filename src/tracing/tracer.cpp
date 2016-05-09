@@ -57,7 +57,7 @@ using patch_point_indirect_memory_t = std::pair<modification_point_t, indirect_m
 
 // using auto here is not supported by C++11 standard (why?)
 dyn_inss_t trace                             = dyn_inss_t();
-map_address_instruction_t cached_instruction_at_address = map_address_instruction_t();
+address_instruction_map_t cached_instruction_at_address = address_instruction_map_t();
 
 static auto state_of_thread                    = std::map<THREADID, tracing_state_t>();
 static auto ins_at_thread                      = std::map<THREADID, dyn_ins_t>();
@@ -317,8 +317,8 @@ static auto save_memory (ADDRINT mem_addr, UINT32 mem_size, THREADID thread_id) 
     if (state_of_thread[thread_id] == ENABLED) {
 
       // any chance for compile time evaluation !?
-      auto& mem_map = (read_or_write == READ) ? std::get<INS_READ_MEMS>(ins_at_thread[thread_id]) :
-                                                std::get<INS_WRITE_MEMS>(ins_at_thread[thread_id]);
+      auto& mem_map = (read_or_write == READ) ? std::get<INS_LOAD_MEMS>(ins_at_thread[thread_id]) :
+                                                std::get<INS_STORE_MEMS>(ins_at_thread[thread_id]);
 
       if (mem_addr != 0) {
         for (decltype(mem_size) idx = 0; idx < mem_size; ++idx) {

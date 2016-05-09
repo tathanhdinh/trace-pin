@@ -12,8 +12,6 @@ extern "C" {
 #include <vector>
 #include <map>
 
-#include "tinyformat.h"
-
 class instruction
 {
  public:
@@ -22,7 +20,10 @@ class instruction
 //  std::string opcode;
 //  xed_decoded_inst_t* decoded_opcode;
   uint8_t opcode_size;
+  std::shared_ptr<uint8_t> opcode_buffer;
+
   std::string disassemble;
+
   std::string including_image;
   std::string including_routine_name;
 
@@ -51,8 +52,8 @@ class instruction
 
 using p_instruction_t             = std::shared_ptr<instruction>;
 using p_instructions_t            = std::vector<p_instruction_t>;
-using map_address_instruction_t   = std::map<ADDRINT, p_instruction_t>;
-using p_map_address_instruction_t = std::shared_ptr<map_address_instruction_t>;
+using address_instruction_map_t   = std::map<ADDRINT, p_instruction_t>;
+using p_address_instruction_map_t = std::shared_ptr<address_instruction_map_t>;
 
 #endif
 

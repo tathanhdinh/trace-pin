@@ -4,8 +4,12 @@ instruction::instruction(const INS& ins)
 {
   this->address     = INS_Address(ins);
   this->next_address = INS_NextAddress(ins);
+
 //  this->opcode      = INS_Mnemonic(ins);
   this->opcode_size = static_cast<uint8_t>(INS_Size(ins));
+  this->opcode_buffer = std::shared_ptr<uint8_t>(new uint8_t[this->opcode_size], std::default_delete<uint8_t[]>());
+  PIN_SafeCopy(opcode_buffer.get(), reinterpret_cast<const VOID*>(this->address), this->opcode_size);
+
   this->disassemble = INS_Disassemble(ins);
 
   // including image, routine

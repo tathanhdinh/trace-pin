@@ -29,7 +29,7 @@ using dyn_ins_t = std::tuple<
 using dyn_inss_t = std::list<dyn_ins_t>;
 
 extern dyn_inss_t                trace;
-extern map_address_instruction_t cached_instruction_at_address;
+extern address_instruction_map_t cached_instruction_at_address;
 
 enum
   {
@@ -37,10 +37,8 @@ enum
     INS_THREAD_ID     = 1,
     INS_READ_REGS     = 2,
     INS_WRITE_REGS    = 3,
-    INS_READ_MEMS     = 4,
-    INS_WRITE_MEMS    = 5,
+    INS_LOAD_MEMS     = 4,
+    INS_STORE_MEMS    = 5,
   };
-
-//auto normalize_hex_string (const std::string& input) -> std::string;
 
 #endif // TRACE_H
