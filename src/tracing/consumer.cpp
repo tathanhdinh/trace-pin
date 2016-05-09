@@ -9,7 +9,7 @@
 
 static auto protobuf_chunk = trace_format::chunk_t();
 static std::ofstream protobuf_trace_file;
-static auto trace_length = uint32_t{0};
+static auto current_trace_length = uint32_t{0};
 
 //static auto real_value_of_reg (const dyn_reg_t& reg_val) -> ADDRINT
 //{
@@ -77,7 +77,7 @@ static auto set_trace_header () -> void
 static auto add_trace_instruction (trace_format::chunk_t& chunk, const dyn_ins_t& ins) -> void
 {
   auto ins_address = std::get<INS_ADDRESS>(ins);
-  auto p_static_ins = cached_ins_at_addr[ins_address];
+  auto p_static_ins = cached_instruction_at_address[ins_address];
 
   // add a new body as an instruction
   auto p_ins_body = chunk.add_body();
@@ -239,7 +239,7 @@ auto flush_trace_in_protobuf_format () -> void
   if (!trace.empty()) {
     tfm::format(std::cerr, "flush %d instructions\n", trace.size());
 
-    trace_length += trace.size();
+    current_trace_length += trace.size();
 
     // add instructions
     for (const auto& ins : trace) {
@@ -266,7 +266,7 @@ auto flush_trace_in_protobuf_format () -> void
 /*                                                     exported functions                                             */
 /*====================================================================================================================*/
 
-auto cap_parser_initialize (const std::string& filename) -> void
+auto pintool_initialize_trace_file (const std::string& filename) -> void
 {
   try {
     protobuf_trace_file.open(filename.c_str(), std::ofstream::out | std::ofstream::binary | std::ofstream::trunc);
@@ -278,16 +278,16 @@ auto cap_parser_initialize (const std::string& filename) -> void
   }
 }
 
-auto cap_flush_trace () -> void
+auto pintool_flush_trace () -> void
 {
   flush_trace_in_protobuf_format();
   return;
 }
 
-auto cap_parser_finalize () -> void
+auto pintool_finalize_output_file () -> void
 {
   try {
-    tfm::format(std::cerr, "trace length: %d instructions\n", trace_length);
+    tfm::format(std::cerr, "trace length: %d instructions\n", current_trace_length);
     protobuf_trace_file.close();
 
     // free internal objects of protobuf

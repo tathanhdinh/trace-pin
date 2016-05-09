@@ -29,7 +29,7 @@ using dyn_ins_t = std::tuple<
 using dyn_inss_t = std::list<dyn_ins_t>;
 
 extern dyn_inss_t                trace;
-extern map_address_instruction_t cached_ins_at_addr;
+extern map_address_instruction_t cached_instruction_at_address;
 
 enum
   {
