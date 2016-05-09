@@ -1,5 +1,7 @@
 #include "instruction.h"
 
+#include <algorithm>
+
 instruction::instruction(const INS& ins)
 {
   this->address     = INS_Address(ins);

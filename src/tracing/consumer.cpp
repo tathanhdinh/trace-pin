@@ -10,34 +10,6 @@ static auto protobuf_chunk = trace_format::chunk_t();
 static std::ofstream protobuf_trace_file;
 static auto current_trace_length = uint32_t{0};
 
-//static auto real_value_of_reg (const dyn_reg_t& reg_val) -> ADDRINT
-//{
-//  auto reg_size = REG_Size(std::get<0>(reg_val));
-//  ASSERTX((reg_size == 1) || (reg_size == 2) || (reg_size == 4) || (reg_size == 8));
-
-//  auto real_val = ADDRINT{0};
-//  switch (reg_size) {
-//  case 1:
-//    real_val = std::get<1>(reg_val).byte[0];
-//    break;
-
-//  case 2:
-//    real_val = std::get<1>(reg_val).word[0];
-//    break;
-
-//  case 4:
-//    real_val = std::get<1>(reg_val).dword[0];
-//    break;
-
-//  case 8:
-//    real_val = std::get<1>(reg_val).qword[0];
-//    break;
-//  }
-
-//  return real_val;
-//};
-
-
 static auto set_trace_header () -> void
 {
   auto trace_header = trace_format::header_t();
@@ -73,11 +45,11 @@ static auto set_trace_header () -> void
 
 
 enum REG_RW_T { REG_READ = 0, REG_WRITE = 1 };
-auto add_registers_into_protobuf_instruction(dyn_ins_t& ins, const p_instruction_t static_ins,
+auto add_registers_into_protobuf_instruction(const dyn_ins_t& ins, const p_instruction_t static_ins,
                                              trace_format::instruction_t* p_proto_ins, REG_RW_T reg_type) -> void
 {
   const auto& regs = (reg_type == REG_READ) ? static_ins->src_registers : static_ins->dst_registers;
-  auto& reg_value_map = (reg_type == REG_READ) ? std::get<INS_READ_REGS>(ins) : std::get<INS_WRITE_REGS>(ins);
+  const auto& reg_value_map = (reg_type == REG_READ) ? std::get<INS_READ_REGS>(ins) : std::get<INS_WRITE_REGS>(ins);
 
   for (const auto& pin_reg : regs) {
     auto p_new_concrete_info = p_proto_ins->add_c_info();
@@ -86,11 +58,11 @@ auto add_registers_into_protobuf_instruction(dyn_ins_t& ins, const p_instruction
     p_reg_info->set_name(REG_StringShort(pin_reg));
     switch (sizeof(ADDRINT)) {
     case 4:
-      (p_reg_info->mutable_value())->set_value_32(reg_value_map[pin_reg].dword[0]);
+      (p_reg_info->mutable_value())->set_value_32(reg_value_map.at(pin_reg).dword[0]);
       break;
 
     case 8:
-      (p_reg_info->mutable_value())->set_value_64(reg_value_map[pin_reg].qword[0]);
+      (p_reg_info->mutable_value())->set_value_64(reg_value_map.at(pin_reg).qword[0]);
       break;
     }
   }
@@ -100,7 +72,7 @@ auto add_registers_into_protobuf_instruction(dyn_ins_t& ins, const p_instruction
 
 
 enum MEM_RW_T { MEM_LOAD = 0, MEM_STORE = 1 };
-auto add_memories_into_protobuf_instruction (dyn_ins_t& ins,
+auto add_memories_into_protobuf_instruction (const dyn_ins_t& ins,
                                              trace_format::instruction_t* p_proto_ins, MEM_RW_T mem_type) -> void
 {
   const auto& mems = (mem_type == MEM_LOAD) ? std::get<INS_LOAD_MEMS>(ins) : std::get<INS_STORE_MEMS>(ins);
@@ -123,7 +95,7 @@ auto add_memories_into_protobuf_instruction (dyn_ins_t& ins,
   return;
 }
 
-static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, dyn_ins_t& ins) -> void
+static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, const dyn_ins_t& ins) -> void
 {
   auto ins_address = std::get<INS_ADDRESS>(ins);
   const auto p_static_ins = cached_instruction_at_address[ins_address];
@@ -210,7 +182,14 @@ auto pintool_initialize_trace_file (const std::string& filename) -> void
 
 auto pintool_flush_trace () -> void
 {
-  flush_trace_in_protobuf_format();
+  try {
+    flush_trace_in_protobuf_format();
+  }
+  catch (const std::exception& expt) {
+    tfm::printfln("%s", expt.what());
+    PIN_ExitProcess(1);
+  }
+
   return;
 }
 
@@ -227,19 +206,4 @@ auto pintool_finalize_output_file () -> void
     tfm::printfln("%s", expt.what());
     PIN_ExitProcess(1);
   }
-}
-
-
-auto cap_load_trace_from_file (std::string& filename) -> void
-{
-  std::ifstream trace_file(filename.c_str(), std::ifstream::in | std::ifstream::binary);
-
-  auto trace_loader = trace_format::trace_t();
-  if (trace_loader.ParseFromIstream(&trace_file)) {
-    auto trace_header = trace_loader.header();
-  }
-
-  trace_file.close();
-  google::protobuf::ShutdownProtobufLibrary();
-  return;
 }

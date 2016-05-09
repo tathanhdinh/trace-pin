@@ -254,7 +254,6 @@ static auto update_condition (ADDRINT ins_addr, THREADID thread_id) -> void
 static auto initialize_instruction (ADDRINT ins_addr, THREADID thread_id) -> void
 {
   if (state_of_thread[thread_id] == ENABLED) {
-
     ins_at_thread[thread_id] = dyn_ins_t(ins_addr,          // instruction address
                                          thread_id,         // thread id
                                          dyn_regs_t(),      // read registers
@@ -310,7 +309,7 @@ enum rw_t { READ = 0, WRITE = 1 };
 template <rw_t read_or_write>
 static auto save_memory (ADDRINT mem_addr, UINT32 mem_size, THREADID thread_id) -> void
 {
-  static_assert((read_or_write == READ) || (read_or_write == WRITE), "unknown action");
+//  static_assert((read_or_write == READ) || (read_or_write == WRITE), "unknown action");
 
   if (ins_at_thread.find(thread_id) != ins_at_thread.end()) {
 
@@ -340,7 +339,7 @@ static auto add_to_trace (ADDRINT ins_addr, THREADID thread_id) -> void
   if (ins_at_thread.find(thread_id) != ins_at_thread.end() &&
       state_of_thread[thread_id] == ENABLED) {
 
-    if (trace.size() >= 5000) {
+    if (trace.size() >= chunk_size) {
         current_trace_length += trace.size();
 
         if (current_trace_length >= limit_trace_length) {
