@@ -73,10 +73,10 @@ static auto set_trace_header () -> void
 
 
 enum REG_RW_T { REG_READ = 0, REG_WRITE = 1 };
-auto add_registers_into_protobuf_instruction(dyn_ins_t& ins, const instruction& static_ins,
+auto add_registers_into_protobuf_instruction(dyn_ins_t& ins, const p_instruction_t static_ins,
                                              trace_format::instruction_t* p_proto_ins, REG_RW_T reg_type) -> void
 {
-  const auto& regs = (reg_type == REG_READ) ? static_ins.src_registers : static_ins.dst_registers;
+  const auto& regs = (reg_type == REG_READ) ? static_ins->src_registers : static_ins->dst_registers;
   auto& reg_value_map = (reg_type == REG_READ) ? std::get<INS_READ_REGS>(ins) : std::get<INS_WRITE_REGS>(ins);
 
   for (const auto& pin_reg : regs) {
@@ -99,18 +99,34 @@ auto add_registers_into_protobuf_instruction(dyn_ins_t& ins, const instruction& 
 }
 
 
-enum MEM_RW_T { MEM_READ = 0, MEM_WRITE = 1 };
+enum MEM_RW_T { MEM_LOAD = 0, MEM_STORE = 1 };
 auto add_memories_into_protobuf_instruction (dyn_ins_t& ins,
                                              trace_format::instruction_t* p_proto_ins, MEM_RW_T mem_type) -> void
 {
-  const auto& mems = (mem_type == MEM_READ) ? std::get<INS_LOAD_MEMS>(ins) : std::get<INS_STORE_MEMS>(ins);
+  const auto& mems = (mem_type == MEM_LOAD) ? std::get<INS_LOAD_MEMS>(ins) : std::get<INS_STORE_MEMS>(ins);
+
+  for (const auto& addr_val : mems) {
+    auto p_new_concrete_info = p_proto_ins->add_c_info();
+    auto p_mem_info = (mem_type == MEM_LOAD) ? p_new_concrete_info->mutable_load_memory() : p_new_concrete_info->mutable_store_memory();
+
+    p_mem_info->set_value(std::get<1>(addr_val));
+    switch (sizeof(ADDRINT)) {
+    case 4:
+      (p_mem_info->mutable_address())->set_value_32(std::get<0>(addr_val));
+      break;
+    case 8:
+      (p_mem_info->mutable_address())->set_value_64(std::get<0>(addr_val));
+      break;
+    }
+  }
+
   return;
 }
 
-static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, const dyn_ins_t& ins) -> void
+static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, dyn_ins_t& ins) -> void
 {
   auto ins_address = std::get<INS_ADDRESS>(ins);
-  auto p_static_ins = cached_instruction_at_address[ins_address];
+  const auto p_static_ins = cached_instruction_at_address[ins_address];
 
   // add new instruction
   auto p_new_ins = chunk.add_instructions();
@@ -131,167 +147,18 @@ static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, const dyn_
   }
 
   // fill opcode
-//  auto opcode_size = p_static_ins->opcode_size;
-//  auto opcode_buffer = std::shared_ptr<uint8_t>(new uint8_t[opcode_size], std::default_delete<uint8_t[]>());
-//  PIN_SafeCopy(opcode_buffer.get(), reinterpret_cast<const VOID*>(ins_address), opcode_size);
   p_new_ins->set_opcode(p_static_ins->opcode_buffer.get(), p_static_ins->opcode_size);
 
   // fill disassemble
   p_new_ins->set_disassemble(p_static_ins->disassemble);
 
-  //
+  // fill read/write registers
+  add_registers_into_protobuf_instruction(ins, p_static_ins, p_new_ins, REG_READ);
+  add_registers_into_protobuf_instruction(ins, p_static_ins, p_new_ins, REG_WRITE);
 
-
-//  // add a new body as an instruction
-//  auto p_ins_body = chunk.add_body();
-//  p_ins_body->set_typeid_(trace_format::INSTRUCTION);
-//  p_ins_body->clear_metadata();
-
-//  // create an instruction for this body, and set some information
-//  auto p_instruction = p_ins_body->mutable_instruction();
-//  p_instruction->set_thread_id(std::get<INS_THREAD_ID>(ins));
-
-//  auto opc_size = p_static_ins->opcode_size;
-//  auto opc_buffer = std::shared_ptr<uint8_t>(new uint8_t[opc_size], std::default_delete<uint8_t[]>());
-
-//  PIN_SafeCopy(opc_buffer.get(), reinterpret_cast<const VOID*>(ins_address), opc_size);
-//  p_instruction->set_opcode(opc_buffer.get(), p_static_ins->opcode_size);
-
-//  auto p_ins_addr = p_instruction->mutable_address();
-
-//  static_assert(((sizeof(ADDRINT) == 4) || (sizeof(ADDRINT) == 8)), "address size must be 32 or 64 bit");
-
-//  switch (sizeof(ADDRINT)) {
-//  case 4:
-//    p_ins_addr->set_typeid_(trace_format::BIT32);
-//    p_ins_addr->set_value_32(ins_address);
-//    p_ins_addr->clear_value_64();
-//    break;
-
-//  case 8:
-//    p_ins_addr->set_typeid_(trace_format::BIT64);
-//    p_ins_addr->set_value_64(ins_address);
-//    p_ins_addr->clear_value_32();
-//    break;
-//  }
-
-//  p_instruction->set_disassemble(p_static_ins->disassemble);
-
-  enum REG_T { REG_READ = 0, REG_WRITE = 1 };
-  auto add_registers = [&p_instruction, &ins, &p_static_ins](REG_T reg_type) -> void
-  {
-    const auto & regs = (reg_type == REG_READ) ? p_static_ins->src_registers : p_static_ins->dst_registers;
-    auto value_of_reg = (reg_type == REG_READ) ? std::get<INS_READ_REGS>(ins) : std::get<INS_WRITE_REGS>(ins);
-    auto reg_typeid = (reg_type == REG_READ) ? trace_format::REGREAD : trace_format::REGWRITE;
-
-    std::for_each(std::begin(regs), std::end(regs), [&](REG pin_reg)
-    {
-      // create a new concrete info
-      auto p_new_con_info = p_instruction->add_concrete_info();
-
-      // set corresponding type for the concrete info (REGLOAD or REGSTORE)
-      p_new_con_info->set_typeid_(reg_typeid);
-
-      // allocate a new register for the concrete info, set its name
-      auto p_new_reg =
-          (reg_type == REG_READ) ? p_new_con_info->mutable_read_register() : p_new_con_info->mutable_write_register();
-      p_new_reg->set_name(REG_StringShort(pin_reg));
-
-      // then set its value
-      auto p_reg_value = p_new_reg->mutable_value();
-      switch (REG_Width(pin_reg)) { // or we can use REG_Size
-      case REGWIDTH_8:
-        p_reg_value->set_typeid_(trace_format::BIT8);
-        p_reg_value->set_value_8(value_of_reg[pin_reg].byte[0]);
-        break;
-
-      case REGWIDTH_16:
-        p_reg_value->set_typeid_(trace_format::BIT16);
-        p_reg_value->set_value_16(value_of_reg[pin_reg].word[0]);
-        break;
-
-      case REGWIDTH_32:
-        p_reg_value->set_typeid_(trace_format::BIT32);
-        p_reg_value->set_value_32(value_of_reg[pin_reg].dword[0]);
-        break;
-
-      case REGWIDTH_64:
-        p_reg_value->set_typeid_(trace_format::BIT64);
-        p_reg_value->set_value_64(value_of_reg[pin_reg].qword[0]);
-        break;
-
-      default:
-        break;
-      }
-    });
-
-
-    return;
-  };
-
-  enum MEM_T { MEM_READ = 0, MEM_WRITE = 1 };
-  auto add_mems = [&p_instruction, &ins](MEM_T mem_type) -> void
-  {
-    auto mems = (mem_type == MEM_READ) ? std::get<INS_LOAD_MEMS>(ins) : std::get<INS_STORE_MEMS>(ins);
-
-    for (auto const& addr_val : mems) {
-
-      // add a new concrete info and set it by the memory instance
-      auto new_mem_con_info = p_instruction->add_concrete_info();
-      switch (mem_type) {
-      case MEM_READ:
-        new_mem_con_info->set_typeid_(trace_format::MEMLOAD);
-        break;
-
-      case MEM_WRITE:
-        new_mem_con_info->set_typeid_(trace_format::MEMSTORE);
-        break;
-      }
-
-      // add a new memory instance
-      auto new_mem = (mem_type == MEM_READ) ?
-            new_mem_con_info->mutable_load_memory() : new_mem_con_info->mutable_store_memory();
-      auto new_mem_addr = new_mem->mutable_address();
-      auto new_mem_val = new_mem->mutable_value();
-
-      auto pin_mem_addr = std::get<0>(addr_val);
-      auto pin_mem_val = std::get<1>(addr_val);
-
-
-      switch (sizeof(ADDRINT)) {
-      case 4:
-        new_mem_addr->set_typeid_(trace_format::BIT32);
-        new_mem_val->set_typeid_(trace_format::BIT32);
-
-        new_mem_addr->set_value_32(pin_mem_addr);
-        new_mem_val->set_value_32(pin_mem_val);
-        break;
-
-      case 8:
-        new_mem_addr->set_typeid_(trace_format::BIT64);
-        new_mem_val->set_typeid_(trace_format::BIT64);
-
-        new_mem_addr->set_value_64(pin_mem_addr);
-        new_mem_val->set_value_64(pin_mem_val);
-        break;
-      }
-    }
-    return;
-  };
-
-#if defined(FAST_TRACING)
-  auto concrete_info = p_instruction->add_concrete_info();
-  concrete_info->set_typeid_(trace_format::NOT_RETRIEVED);
-#else
-
-  // set read/write registers
-  add_registers(REG_READ);
-  add_registers(REG_WRITE);
-
-  // set read/write memories
-  add_mems(MEM_READ);
-  add_mems(MEM_WRITE);
-#endif
+  // fill load/store memories
+  add_memories_into_protobuf_instruction(ins, p_new_ins, MEM_LOAD);
+  add_memories_into_protobuf_instruction(ins, p_new_ins, MEM_STORE);
 
   return;
 }
@@ -305,7 +172,7 @@ auto flush_trace_in_protobuf_format () -> void
     current_trace_length += trace.size();
 
     // add instructions
-    for (const auto& ins : trace) {
+    for (auto& ins : trace) {
       add_instruction_into_chunk(protobuf_chunk, ins);
     }
 

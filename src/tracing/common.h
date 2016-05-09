@@ -14,7 +14,7 @@ using dyn_reg_t  = std::pair<REG, PIN_REGISTER>;
 //using dyn_mem_t  = std::pair<ADDRINT, UINT8>;
 
 using dyn_regs_t = std::map<REG, PIN_REGISTER>;
-using dyn_mems_t = std::map<ADDRINT, ADDRINT>;
+using dyn_mems_t = std::map<ADDRINT, UINT8>;
 
 using dyn_ins_t = std::tuple<
   ADDRINT,        // address of instruction
