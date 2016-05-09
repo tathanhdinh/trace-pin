@@ -6,6 +6,7 @@
 
 #include "json.hpp"
 
+#include <fstream>
 #include <algorithm>
 #include <exception>
 #include <type_traits>
@@ -68,10 +69,16 @@ auto parse_configuration (const std::string& filename) -> void
   pintool_set_stop_address(stop_address);
 
   // parse "limit trace length"
-  std::string limit_length_str = config_json["length"];
+  std::string limit_length_str = config_json["limit_length"];
   auto limit_length = static_cast<ADDRINT>(std::stoul(limit_length_str, 0, 0));
 
   pintool_set_trace_limit_length(limit_length);
+
+  // parse "chunk size"
+  std::string chunk_size_str = config_json["chunk_size"];
+  auto chunk_size = static_cast<ADDRINT>(std::stoul(chunk_size_str, 0, 0));
+
+  pintool_set_chunk_size(chunk_size);
 
   // parse "skip" entries
   auto skip_entries = std::vector<nlohmann::json>{config_json["skip"]};

@@ -9,6 +9,8 @@ auto initialize_pintool_state () -> void;
 
 auto pintool_set_trace_limit_length (uint32_t trace_length) -> void;
 
+auto pintool_set_chunk_size (uint32_t length) -> void;
+
 auto pintool_set_start_address (ADDRINT address) -> void;
 auto pintool_set_stop_address (ADDRINT address) -> void;
 

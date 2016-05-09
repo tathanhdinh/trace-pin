@@ -72,6 +72,8 @@ static auto callee_skip_addresses = std::vector<ADDRINT>();
 static auto limit_trace_length = uint32_t{0};
 static auto current_trace_length = uint32_t{0};
 
+static auto chunk_size = uint32_t{100};
+
 static auto modified_register_at_address        = std::vector<patch_point_register_t>();
 static auto modified_memory_at_address          = std::vector<patch_point_memory_t>();
 static auto execution_order_of_instruction_at_address = std::map<ADDRINT, UINT32>();
@@ -98,7 +100,6 @@ enum event_t
 static auto reinstrument_if_some_thread_started (ADDRINT current_addr,
                                                  ADDRINT next_addr, const CONTEXT* p_ctxt) -> void
 {
-//  assert(current_addr != start_address);
   ASSERTX(!some_thread_is_started);
 
   if (cached_instruction_at_address[current_addr]->is_ret) {
@@ -207,8 +208,6 @@ static auto update_condition (ADDRINT ins_addr, THREADID thread_id) -> void
       if ((state_of_thread[thread_id] != NOT_STARTED) && (state_of_thread[thread_id] != DISABLED)) {
 
         if ((std::get<INS_ADDRESS>(ins_at_thread[thread_id]) == stop_address) && (stop_address != 0x0)) {
-//          loop_count--;
-//          if (loop_count <= 0) state_of_thread[thread_id] = DISABLED;
           state_of_thread[thread_id] = DISABLED;
         }
       }
@@ -1177,9 +1176,16 @@ auto pintool_add_callee_skip_addresses (ADDRINT address) -> void
 }
 
 
-auto pintool_set_trace_limit_length (uint32_t trace_length) -> void
+auto pintool_set_trace_limit_length (uint32_t length) -> void
 {
-  limit_trace_length = trace_length;
+  limit_trace_length = length;
+  return;
+}
+
+
+auto pintool_set_chunk_size (uint32_t length) -> void
+{
+  chunk_size = length;
   return;
 }
 
