@@ -142,6 +142,8 @@ static auto update_skip_addresses(ADDRINT ins_addr, ADDRINT target_addr) -> void
 
 static auto reinstrument_because_of_suspended_state (const CONTEXT* p_ctxt, ADDRINT ins_addr) -> void
 {
+  static_cast<void>(ins_addr);
+
   auto new_state = std::any_of(std::begin(state_of_thread), std::end(state_of_thread),
                                [](decltype(state_of_thread)::const_reference thread_state) {
       static_assert(std::is_same<decltype(std::get<1>(thread_state)), const tracing_state_t&>::value, "type conflict");
@@ -382,24 +384,24 @@ static auto patch_register (ADDRINT ins_addr, bool patch_point, UINT32 patch_reg
 {
   static_cast<void>(thread_id);
 
-  ASSERTX(REG_valid(static_cast<REG>(patch_reg)) && "the needed to patch register is invalid");
+//  ASSERTX(REG_valid(static_cast<REG>(patch_reg)) && "the needed to patch register is invalid");
 
   for (auto const& patch_reg_info : modified_register_at_address) {
 
-    auto patch_exec_point  = std::get<0>(patch_reg_info);
-    auto patch_reg_value = std::get<1>(patch_reg_info);
+    auto patch_exec_point = std::get<0>(patch_reg_info);
+    auto patch_reg_value  = std::get<1>(patch_reg_info);
 
     auto exec_point        = std::get<0>(patch_exec_point);
     auto exec_addr         = std::get<0>(exec_point);
     auto exec_order        = std::get<1>(exec_point);
 
-    auto found_patch_point = std::get<1>(patch_exec_point);
-    auto found_patch_reg   = std::get<0>(patch_reg_value);
+    auto needed_patch_point = std::get<1>(patch_exec_point);
+    auto needed_patch_reg   = std::get<0>(patch_reg_value);
 
-    ASSERTX(REG_valid(found_patch_reg) && "the patched register is invalid");
+//    ASSERTX(REG_valid(needed_patch_reg) && "the patched register is invalid");
 
     if ((exec_addr == ins_addr) && (exec_order == execution_order_of_instruction_at_address[ins_addr]) &&
-        (found_patch_point == patch_point) && (found_patch_reg == patch_reg)) {
+        (needed_patch_point == patch_point) && (needed_patch_reg == patch_reg)) {
 
       auto reg_info        = std::get<1>(patch_reg_info);
       auto reg_size        = static_cast<uint8_t>(REG_Size(std::get<0>(reg_info)));
@@ -442,80 +444,68 @@ static auto patch_memory (ADDRINT ins_addr, bool patch_point, ADDRINT patch_mem_
 
   for (auto const& patch_mem_info : modified_memory_at_address) {
 
-    auto patch_exec_point  = std::get<0>(patch_mem_info);
+    auto patch_exec_point = std::get<0>(patch_mem_info);
+    auto patch_mem_value  = std::get<1>(patch_mem_info);
+
     auto exec_point        = std::get<0>(patch_exec_point);
     auto exec_addr         = std::get<0>(exec_point);
     auto exec_order        = std::get<1>(exec_point);
-    auto exec_patch_point  = std::get<1>(patch_exec_point);
 
-    auto patch_mem_val = std::get<1>(patch_mem_info);
-    auto found_mem_addr = std::get<0>(patch_mem_val);
+    auto needed_patch_point    = std::get<1>(patch_exec_point);
+    auto needed_patch_mem_addr = std::get<0>(patch_mem_value);
 
     if ((exec_addr == ins_addr) && (exec_order == execution_order_of_instruction_at_address[ins_addr]) &&
-        (exec_patch_point == patch_point) && (found_mem_addr == patch_mem_addr)) {
+        (needed_patch_point == patch_point) && (needed_patch_mem_addr == patch_mem_addr)) {
 
-      auto mem_size  = std::get<1>(patch_mem_val);
-      auto mem_value = std::get<2>(patch_mem_val);
+      auto mem_value = std::get<1>(patch_mem_value);
 
-      tfm::format(std::cerr, "at 0x%x: will patch %d bytes at 0x%x by value 0x%x\n", exec_addr,
-                    mem_size, found_mem_addr, mem_value);
-
-      auto excp_info = EXCEPTION_INFO();
-      auto patched_mem_size = PIN_SafeCopyEx(reinterpret_cast<uint8_t*>(found_mem_addr),
-                                             reinterpret_cast<uint8_t*>(&mem_value), mem_size, &excp_info);
-      if (patched_mem_size != mem_size) {
-        tfm::format(std::cerr, "error: %s\n", PIN_ExceptionToString(&excp_info));
-      }
-      else {
-        tfm::format(std::cerr, "after patching: ADDRINT value at 0x%x is 0x%x\n", found_mem_addr,
-                    *reinterpret_cast<ADDRINT*>(found_mem_addr));
-      }
+      PIN_SafeCopy(reinterpret_cast<uint8_t*>(needed_patch_mem_addr), &mem_value, 1);
     }
   }
   return;
 }
 
 
-static auto patch_indirect_memory (ADDRINT ins_addr, bool patch_point,
-                                   UINT32 patch_indirect_reg, ADDRINT patch_indirect_addr, THREADID thread_id) -> void
-{
-  static_cast<void>(thread_id);
-  ASSERTX(REG_valid(static_cast<REG>(patch_indirect_reg)) && "the patched register is invalid");
+//static auto patch_indirect_memory (ADDRINT ins_addr, bool patch_point,
+//                                   UINT32 patch_indirect_reg, ADDRINT patch_indirect_addr, THREADID thread_id) -> void
+//{
+//  static_cast<void>(thread_id);
+//  ASSERTX(REG_valid(static_cast<REG>(patch_indirect_reg)) && "the patched register is invalid");
 
-  for (auto const& patch_indirect_mem_info : patched_indirect_memory_at_address) {
-    auto patch_exec_point = std::get<0>(patch_indirect_mem_info);
-    auto exec_point       = std::get<0>(patch_exec_point);
-    auto exec_addr        = std::get<0>(exec_point);
-    auto exec_order       = std::get<1>(exec_point);
-    auto patch_pos        = std::get<1>(patch_exec_point); // before or after
+//  for (auto const& patch_indirect_mem_info : patched_indirect_memory_at_address) {
+//    auto patch_exec_point = std::get<0>(patch_indirect_mem_info);
+//    auto exec_point       = std::get<0>(patch_exec_point);
+//    auto exec_addr        = std::get<0>(exec_point);
+//    auto exec_order       = std::get<1>(exec_point);
+//    auto patch_pos        = std::get<1>(patch_exec_point); // before or after
 
-    auto patch_indirect_info = std::get<1>(patch_indirect_mem_info);
-    auto need_to_patch_indirect_reg   = std::get<0>(patch_indirect_info);
+//    auto patch_indirect_info = std::get<1>(patch_indirect_mem_info);
+//    auto need_to_patch_indirect_reg   = std::get<0>(patch_indirect_info);
 
-    if ((exec_addr == ins_addr) && (exec_order == execution_order_of_instruction_at_address[ins_addr]) &&
-        (patch_pos == patch_point) && (need_to_patch_indirect_reg == patch_indirect_reg)) {
+//    if ((exec_addr == ins_addr) && (exec_order == execution_order_of_instruction_at_address[ins_addr]) &&
+//        (patch_pos == patch_point) && (need_to_patch_indirect_reg == patch_indirect_reg)) {
 
-      auto mem_size = std::get<1>(patch_indirect_info);
-      auto mem_value = std::get<2>(patch_indirect_info);
+//      auto mem_size = std::get<1>(patch_indirect_info);
+//      auto mem_value = std::get<2>(patch_indirect_info);
 
-      tfm::format(std::cerr, "at 0x%x: will patch %d bytes at 0x%x by value 0x%x\n",
-                  exec_addr, mem_size, patch_indirect_addr, mem_value);
+//      tfm::format(std::cerr, "at 0x%x: will patch %d bytes at 0x%x by value 0x%x\n",
+//                  exec_addr, mem_size, patch_indirect_addr, mem_value);
 
-      auto excp_info = EXCEPTION_INFO();
-      auto patched_mem_size = PIN_SafeCopyEx(reinterpret_cast<uint8_t*>(patch_indirect_addr),
-                                             reinterpret_cast<uint8_t*>(&mem_value), mem_size, &excp_info);
-      if (patched_mem_size != mem_size) {
-        tfm::format(std::cerr, "error: %s\n", PIN_ExceptionToString(&excp_info));
-      }
-      else {
-        tfm::format(std::cerr, "after patching: ADDRINT value at 0x%x is 0x%x\n",
-                    patch_indirect_addr, *reinterpret_cast<ADDRINT*>(patch_indirect_addr));
-      }
-    }
-  }
+//      auto excp_info = EXCEPTION_INFO();
+//      auto patched_mem_size = PIN_SafeCopyEx(reinterpret_cast<uint8_t*>(patch_indirect_addr),
+//                                             reinterpret_cast<uint8_t*>(&mem_value), mem_size, &excp_info);
+//      if (patched_mem_size != mem_size) {
+//        tfm::format(std::cerr, "error: %s\n", PIN_ExceptionToString(&excp_info));
+//      }
+//      else {
+//        tfm::format(std::cerr, "after patching: ADDRINT value at 0x%x is 0x%x\n",
+//                    patch_indirect_addr, *reinterpret_cast<ADDRINT*>(patch_indirect_addr));
+//      }
+//    }
+//  }
 
-  return;
-}
+//  return;
+//}
 
 //static auto save_before_handling (INS ins) -> void
 //{
@@ -865,9 +855,8 @@ static auto insert_ins_patch_info_callbacks (INS ins) -> void
 
     if (execution_order_of_instruction_at_address.find(ins_addr) != execution_order_of_instruction_at_address.end()) {
 
-      static_assert(std::is_same<
-                    decltype(update_execution_order), VOID (ADDRINT, UINT32)
-                    >::value, "invalid callback function type");
+      static_assert(std::is_same<decltype(update_execution_order), VOID (ADDRINT, UINT32)>::value,
+                    "invalid callback function type");
 
       ins_insert_call<false>(ins,                                               // instrumented instruction
                              IPOINT_BEFORE,                                     // instrumentation point
