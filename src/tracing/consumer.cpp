@@ -45,7 +45,7 @@ static auto set_trace_header () -> void
 
 
 enum REG_RW_T { REG_READ = 0, REG_WRITE = 1 };
-auto add_registers_into_protobuf_instruction(const dyn_ins_t& ins, const p_instruction_t static_ins,
+auto add_registers_into_protobuf_instruction(const dyn_instruction_t& ins, const p_instruction_t static_ins,
                                              trace_format::instruction_t* p_proto_ins, REG_RW_T reg_type) -> void
 {
   const auto& regs = (reg_type == REG_READ) ? static_ins->src_registers : static_ins->dst_registers;
@@ -72,7 +72,7 @@ auto add_registers_into_protobuf_instruction(const dyn_ins_t& ins, const p_instr
 
 
 enum MEM_RW_T { MEM_LOAD = 0, MEM_STORE = 1 };
-auto add_memories_into_protobuf_instruction (const dyn_ins_t& ins,
+auto add_memories_into_protobuf_instruction (const dyn_instruction_t& ins,
                                              trace_format::instruction_t* p_proto_ins, MEM_RW_T mem_type) -> void
 {
   const auto& mems = (mem_type == MEM_LOAD) ? std::get<INS_LOAD_MEMS>(ins) : std::get<INS_STORE_MEMS>(ins);
@@ -95,7 +95,7 @@ auto add_memories_into_protobuf_instruction (const dyn_ins_t& ins,
   return;
 }
 
-static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, const dyn_ins_t& ins) -> void
+static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, const dyn_instruction_t& ins) -> void
 {
   auto ins_address = std::get<INS_ADDRESS>(ins);
   const auto p_static_ins = cached_instruction_at_address[ins_address];

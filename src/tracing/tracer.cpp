@@ -27,9 +27,9 @@ static auto ins_insert_call<false> = INS_InsertCall;
 enum tracing_state_t
 {
   NOT_STARTED = 0,
-  SUSPENDED    = 1,
-  ENABLED             = 3,
-  DISABLED            = 4
+  SUSPENDED   = 1,
+  ENABLED     = 3,
+  DISABLED    = 4
 };
 
 // for patching
@@ -56,15 +56,15 @@ using patch_point_memory_t          = std::pair<modification_point_t, memory_val
 using patch_point_indirect_memory_t = std::pair<modification_point_t, indirect_memory_patch_value_t>;
 
 // using auto here is not supported by C++11 standard (why?)
-dyn_inss_t trace                             = dyn_inss_t();
+dynamic_instructions_t trace                             = dynamic_instructions_t();
 address_instruction_map_t cached_instruction_at_address = address_instruction_map_t();
 
-static auto state_of_thread                    = std::map<THREADID, tracing_state_t>();
-static auto ins_at_thread                      = std::map<THREADID, dyn_ins_t>();
-static auto resume_address_of_thread           = std::map<THREADID, ADDRINT>();
+static auto state_of_thread          = std::map<THREADID, tracing_state_t>();
+static auto ins_at_thread            = std::map<THREADID, dyn_instruction_t>();
+static auto resume_address_of_thread = std::map<THREADID, ADDRINT>();
 
-static auto start_address                      = ADDRINT{0};
-static auto stop_address                       = ADDRINT{0};
+static auto start_address = ADDRINT{0};
+static auto stop_address  = ADDRINT{0};
 
 static auto caller_skip_addresses = std::vector<ADDRINT>();
 static auto callee_skip_addresses = std::vector<ADDRINT>();
@@ -74,12 +74,12 @@ static auto current_trace_length = uint32_t{0};
 
 static auto chunk_size = uint32_t{100};
 
-static auto modified_register_at_address        = std::vector<patch_point_register_t>();
-static auto modified_memory_at_address          = std::vector<patch_point_memory_t>();
+static auto modified_register_at_address              = std::vector<patch_point_register_t>();
+static auto modified_memory_at_address                = std::vector<patch_point_memory_t>();
 static auto execution_order_of_instruction_at_address = std::map<ADDRINT, UINT32>();
 
-static auto some_thread_is_started             = false;
-static auto some_thread_is_not_suspended       = true;
+static auto some_thread_is_started       = false;
+static auto some_thread_is_not_suspended = true;
 
 /*====================================================================================================================*/
 /*                                       callback analysis and support functions                                      */
@@ -103,8 +103,6 @@ static auto reinstrument_if_some_thread_started (ADDRINT current_addr,
   ASSERTX(!some_thread_is_started);
 
   if (cached_instruction_at_address[current_addr]->is_ret) {
-//    ASSERTX(PIN_GetContextReg(p_ctxt, REG_STACK_PTR) == next_addr);
-
     auto return_addr = next_addr;
     PIN_SafeCopy(&return_addr, reinterpret_cast<ADDRINT*>(next_addr), sizeof(ADDRINT));
     next_addr = return_addr;
@@ -154,9 +152,7 @@ static auto reinstrument_because_of_suspended_state (const CONTEXT* p_ctxt, ADDR
   if (new_state != some_thread_is_not_suspended) {
     some_thread_is_not_suspended = new_state;
 
-    tfm::format(std::cerr, "state changed to %s, restart instrumentation...\n",
-                !some_thread_is_not_suspended ? "suspend" : "enable");
-//    cap_flush_trace();
+    tfm::format(std::cerr, "state changed to %s, restart instrumentation...\n", !some_thread_is_not_suspended ? "suspend" : "enable");
 
     PIN_RemoveInstrumentation();
     PIN_ExecuteAt(p_ctxt);
@@ -254,14 +250,15 @@ static auto update_condition (ADDRINT ins_addr, THREADID thread_id) -> void
 static auto initialize_instruction (ADDRINT ins_addr, THREADID thread_id) -> void
 {
   if (state_of_thread[thread_id] == ENABLED) {
-    ins_at_thread[thread_id] = dyn_ins_t(ins_addr,          // instruction address
-                                         thread_id,         // thread id
-                                         dyn_regs_t(),      // read registers
-                                         dyn_regs_t(),      // written registers
-                                         dyn_mems_t(),      // read memory addresses
-                                         dyn_mems_t()       // write memory addresses
-                                         );
+    ins_at_thread[thread_id] = dyn_instruction_t(ins_addr,              // instruction address
+                                                 thread_id,             // thread id
+                                                 dynamic_registers_t(), // read registers
+                                                 dynamic_registers_t(), // written registers
+                                                 dynamic_memories_t(),  // read memory addresses
+                                                 dynamic_memories_t()   // write memory addresses
+                                                 );
   }
+  
   return;
 }
 
@@ -380,41 +377,12 @@ static auto update_execution_order (ADDRINT ins_addr, THREADID thread_id) -> voi
 }
 
 
-template<typename reg_value_type>
-static auto patch_register_of_type (ADDRINT org_patch_val,
-                                    uint8_t val_lo_pos, uint8_t val_hi_pos,
-                                    PIN_REGISTER* p_pin_reg) -> void
-{
-  auto reg_patch_val = org_patch_val << val_lo_pos;
-  auto patch_val_bitsec = std::bitset<std::numeric_limits<reg_value_type>::digits>(reg_patch_val);
-
-  auto pin_current_val = *(reinterpret_cast<reg_value_type*>(p_pin_reg));
-  auto current_val_bitset = std::bitset<numeric_limits<reg_value_type>::digits>(pin_current_val);
-
-  for (auto i = 0; i < std::numeric_limits<reg_value_type>::digits; ++i) {
-    if ((i < val_lo_pos) || (i > val_hi_pos)) patch_val_bitsec[i] = current_val_bitset[i];
-  }
-
-  tfm::format(std::cerr, "value before patching = 0x%x\n", pin_current_val);
-  *(reinterpret_cast<reg_value_type*>(p_pin_reg)) = patch_val_bitsec.to_ulong();
-  tfm::format(std::cerr, "value after patching = 0x%x\n", *(reinterpret_cast<reg_value_type*>(p_pin_reg)));
-  return;
-}
-
-
-static auto patch_register (ADDRINT ins_addr, bool patch_point,
-                            UINT32 patch_reg, PIN_REGISTER* p_register,
+static auto patch_register (ADDRINT ins_addr, bool patch_point, UINT32 patch_reg, PIN_REGISTER* p_register,
                             THREADID thread_id) -> void
 {
-  (void)thread_id;
-  ASSERTX(REG_valid(static_cast<REG>(patch_reg)) && "the needed to patch register is invalid");
+  static_cast<void>(thread_id);
 
-  static auto patch_reg_funs = std::map<
-      uint8_t, std::function<void(ADDRINT, uint8_t, uint8_t, PIN_REGISTER*)>
-      > {
-    {1, patch_register_of_type<uint8_t>}, {2, patch_register_of_type<uint16_t>},
-    {4, patch_register_of_type<uint32_t>}, {8, patch_register_of_type<uint64_t>}
-  };
+  ASSERTX(REG_valid(static_cast<REG>(patch_reg)) && "the needed to patch register is invalid");
 
   for (auto const& patch_reg_info : modified_register_at_address) {
 
@@ -424,6 +392,7 @@ static auto patch_register (ADDRINT ins_addr, bool patch_point,
     auto exec_point        = std::get<0>(patch_exec_point);
     auto exec_addr         = std::get<0>(exec_point);
     auto exec_order        = std::get<1>(exec_point);
+
     auto found_patch_point = std::get<1>(patch_exec_point);
     auto found_patch_reg   = std::get<0>(patch_reg_value);
 
@@ -434,11 +403,28 @@ static auto patch_register (ADDRINT ins_addr, bool patch_point,
 
       auto reg_info        = std::get<1>(patch_reg_info);
       auto reg_size        = static_cast<uint8_t>(REG_Size(std::get<0>(reg_info)));
-      auto reg_lo_pos      = std::get<1>(reg_info);
-      auto reg_hi_pos      = std::get<2>(reg_info);
-      auto reg_patch_val   = std::get<3>(reg_info);
+      auto reg_patch_val   = std::get<1>(reg_info);
 
-      patch_reg_funs[reg_size](reg_patch_val, reg_lo_pos, reg_hi_pos, p_register);
+      switch (reg_size) {
+      case 1:
+        *(reinterpret_cast<uint8_t*>(p_register)) = static_cast<uint8_t>(reg_patch_val);
+        break;
+
+      case 2:
+        *(reinterpret_cast<uint16_t*>(p_register)) = static_cast<uint16_t>(reg_patch_val);
+        break;
+
+      case 4:
+        *(reinterpret_cast<uint32_t*>(p_register)) = static_cast<uint32_t>(reg_patch_val);
+        break;
+
+      case 8:
+        *(reinterpret_cast<uint64_t*>(p_register)) = static_cast<uint64_t>(reg_patch_val);
+        break;
+
+      default:
+        break;
+      }
     }
   }
 
@@ -449,8 +435,8 @@ static auto patch_register (ADDRINT ins_addr, bool patch_point,
 /*
  * Because the thread_id is not used in this function, the memory patching is realized actually by any thread.
  */
-static auto patch_memory (ADDRINT ins_addr, bool patch_point,
-                          ADDRINT patch_mem_addr, THREADID thread_id) -> void
+static auto patch_memory (ADDRINT ins_addr, bool patch_point, ADDRINT patch_mem_addr,
+                          THREADID thread_id) -> void
 {
   static_cast<void>(thread_id);
 
