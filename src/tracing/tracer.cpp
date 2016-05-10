@@ -466,74 +466,6 @@ static auto patch_memory (ADDRINT ins_addr, bool patch_point, ADDRINT patch_mem_
 }
 
 
-//static auto patch_indirect_memory (ADDRINT ins_addr, bool patch_point,
-//                                   UINT32 patch_indirect_reg, ADDRINT patch_indirect_addr, THREADID thread_id) -> void
-//{
-//  static_cast<void>(thread_id);
-//  ASSERTX(REG_valid(static_cast<REG>(patch_indirect_reg)) && "the patched register is invalid");
-
-//  for (auto const& patch_indirect_mem_info : patched_indirect_memory_at_address) {
-//    auto patch_exec_point = std::get<0>(patch_indirect_mem_info);
-//    auto exec_point       = std::get<0>(patch_exec_point);
-//    auto exec_addr        = std::get<0>(exec_point);
-//    auto exec_order       = std::get<1>(exec_point);
-//    auto patch_pos        = std::get<1>(patch_exec_point); // before or after
-
-//    auto patch_indirect_info = std::get<1>(patch_indirect_mem_info);
-//    auto need_to_patch_indirect_reg   = std::get<0>(patch_indirect_info);
-
-//    if ((exec_addr == ins_addr) && (exec_order == execution_order_of_instruction_at_address[ins_addr]) &&
-//        (patch_pos == patch_point) && (need_to_patch_indirect_reg == patch_indirect_reg)) {
-
-//      auto mem_size = std::get<1>(patch_indirect_info);
-//      auto mem_value = std::get<2>(patch_indirect_info);
-
-//      tfm::format(std::cerr, "at 0x%x: will patch %d bytes at 0x%x by value 0x%x\n",
-//                  exec_addr, mem_size, patch_indirect_addr, mem_value);
-
-//      auto excp_info = EXCEPTION_INFO();
-//      auto patched_mem_size = PIN_SafeCopyEx(reinterpret_cast<uint8_t*>(patch_indirect_addr),
-//                                             reinterpret_cast<uint8_t*>(&mem_value), mem_size, &excp_info);
-//      if (patched_mem_size != mem_size) {
-//        tfm::format(std::cerr, "error: %s\n", PIN_ExceptionToString(&excp_info));
-//      }
-//      else {
-//        tfm::format(std::cerr, "after patching: ADDRINT value at 0x%x is 0x%x\n",
-//                    patch_indirect_addr, *reinterpret_cast<ADDRINT*>(patch_indirect_addr));
-//      }
-//    }
-//  }
-
-//  return;
-//}
-
-//static auto save_before_handling (INS ins) -> void
-//{
-//  static_assert(std::is_same<
-//                decltype(save_register<WRITE>), VOID (const CONTEXT*, UINT32)
-//                >::value, "invalid callback function type");
-
-//  auto ins_address = INS_Address(ins);
-//  ASSERTX(!cached_ins_at_addr[ins_address]->is_special);
-
-//  ins_insert_call<false>(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(save_register<WRITE>),
-//                        IARG_CONST_CONTEXT,
-//                        IARG_THREAD_ID,
-//                        IARG_END);
-
-//  static_assert(std::is_same<
-//                decltype(save_memory<WRITE>), VOID (ADDRINT, UINT32, UINT32)
-//                >::value, "invalid callback function type");
-
-//  ins_insert_call<false>(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(save_memory<WRITE>),
-//                        IARG_ADDRINT, 0,
-//                        IARG_UINT32, 0,
-//                        IARG_THREAD_ID,
-//                        IARG_END);
-//  return;
-//}
-
-
 static auto update_condition_before_handling (INS ins) -> void
 {
   static_assert(std::is_same<
@@ -935,45 +867,11 @@ static auto insert_ins_patch_info_callbacks (INS ins) -> void
           }
         }
       }
-
-//      if (indirect_memory_is_patchable) {
-//        for (auto const& patch_indirect_mem_info : patched_indirect_memory_at_address) {
-
-//          auto patch_exec_point = std::get<0>(patch_indirect_mem_info);
-//          auto exec_point       = std::get<0>(patch_exec_point);
-//          auto exec_addr        = std::get<0>(exec_point);
-//          auto exec_order       = std::get<1>(exec_point);
-
-//          if ((exec_addr == ins_addr) && (exec_order >= execution_order_of_instruction_at_address[ins_addr])) {
-//            auto patch_point = std::get<1>(patch_exec_point);
-//            auto pin_patch_point = !patch_point ? IPOINT_BEFORE : IPOINT_AFTER;
-
-//            auto patch_value_info = std::get<1>(patch_indirect_mem_info);
-//            auto patch_indirect_reg = std::get<0>(patch_value_info);
-
-//           static_assert(std::is_same<
-//                         decltype(patch_indirect_memory), VOID (ADDRINT, bool, UINT32, ADDRINT, ADDRINT)
-//                         >::value, "invalid callback function type");
-
-//            ins_insert_call<false>(ins,
-//                                   pin_patch_point,
-//                                   reinterpret_cast<AFUNPTR>(patch_indirect_memory),
-//                                   IARG_INST_PTR,
-//                                   IARG_BOOL, patch_point,
-//                                   IARG_UINT32, patch_indirect_reg,
-//                                   IARG_REG_VALUE, patch_indirect_reg,
-//                                   IARG_THREAD_ID,
-//                                   IARG_END);
-//          }
-//        }
-//      }
     }
 
     register_is_patchable = point_is_patchable<decltype(modified_register_at_address)>(modified_register_at_address);
 
     memory_is_patchable = point_is_patchable<decltype(modified_memory_at_address)>(modified_memory_at_address);
-
-//    indirect_memory_is_patchable = point_is_patchable<decltype(patched_indirect_memory_at_address)>(patched_indirect_memory_at_address);
   }
   return;
 }
