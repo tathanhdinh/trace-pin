@@ -3,15 +3,8 @@
 
 #include "instruction.h"
 
-#include <cstdlib>
-#include <algorithm>
 #include <tuple>
 #include <list>
-
-//#include <boost/variant.hpp>
-
-//using dynamic_register_t  = std::pair<REG, PIN_REGISTER>;
-//using dyn_mem_t  = std::pair<ADDRINT, UINT8>;
 
 using dynamic_registers_t = std::map<REG, PIN_REGISTER>;
 using dynamic_memories_t = std::map<ADDRINT, UINT8>;

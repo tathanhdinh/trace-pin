@@ -10,11 +10,10 @@
 #include <bitset>
 #include <functional>
 
-//#include <boost/type_traits.hpp>
 #include <type_traits>
 #include <typeinfo>
 
-using ins_callback_func_t = VOID(*)(INS ins, IPOINT ipoint, AFUNPTR funptr, ...);
+//using ins_callback_func_t = VOID(*)(INS ins, IPOINT ipoint, AFUNPTR funptr, ...);
 
 //template <bool use_predicated_callback>
 //ins_callback_func_t ins_insert_call;
