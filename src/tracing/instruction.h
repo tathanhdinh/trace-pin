@@ -43,8 +43,8 @@ class instruction
   std::vector<REG> dst_registers;
 
   bool is_memory_read;
+  bool is_memory_read2;
   bool is_memory_write;
-  bool has_memory_read_2;
 
  public:
   instruction(const INS& ins);
