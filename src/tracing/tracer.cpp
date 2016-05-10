@@ -10,7 +10,8 @@
 #include <bitset>
 #include <functional>
 
-#include <boost/type_traits.hpp>
+//#include <boost/type_traits.hpp>
+#include <type_traits>
 #include <typeinfo>
 
 using ins_callback_func_t = VOID(*)(INS ins, IPOINT ipoint, AFUNPTR funptr, ...);
@@ -326,12 +327,12 @@ static auto save_memory (ADDRINT mem_addr, UINT32 mem_size, THREADID thread_id) 
 }
 
 
-static auto add_to_trace (ADDRINT ins_addr, THREADID thread_id) -> void
+static auto add_instruction_into_trace (ADDRINT ins_addr, THREADID thread_id) -> void
 {
   static_cast<void>(ins_addr);
 
-  if (ins_at_thread.find(thread_id) != ins_at_thread.end() &&
-      state_of_thread[thread_id] == ENABLED) {
+  if (ins_at_thread.find(thread_id) != ins_at_thread.end() && state_of_thread[thread_id] == ENABLED) {
+    trace.push_back(ins_at_thread[thread_id]);
 
     if (trace.size() >= chunk_size) {
         current_trace_length += trace.size();
@@ -650,9 +651,9 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
       /*
        * Now, add the instruction into the trace
        */
-      static_assert(std::is_same<decltype(add_to_trace), VOID (ADDRINT, UINT32)>::value, "invalid callback function type");
+      static_assert(std::is_same<decltype(add_instruction_into_trace), VOID (ADDRINT, UINT32)>::value, "invalid callback function type");
 
-      ins_insert_call<false>(ins, IPOINT_AFTER, reinterpret_cast<AFUNPTR>(add_to_trace),
+      ins_insert_call<false>(ins, IPOINT_AFTER, reinterpret_cast<AFUNPTR>(add_instruction_into_trace),
                              IARG_INST_PTR,
                              IARG_THREAD_ID,
                              IARG_END);
@@ -860,9 +861,9 @@ static auto ins_mode_get_ins_info (INS ins, VOID* data) -> VOID
 }
 
 
-static auto trace_mode_get_ins_info (TRACE trace, VOID* data) -> VOID
+static auto trace_mode_get_instruction_information (TRACE trace, VOID* data) -> VOID
 {
-  (void)data;
+  static_cast<void>(data);
 
   for (auto bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl)) {
     for (auto ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins)) {
@@ -875,7 +876,8 @@ static auto trace_mode_get_ins_info (TRACE trace, VOID* data) -> VOID
 
 static auto ins_mode_patch_ins_info (INS ins, VOID* data) -> VOID
 {
-  (void)data;
+  static_cast<void>(data);
+
   insert_ins_patch_info_callbacks(ins);
   return;
 }
@@ -883,7 +885,7 @@ static auto ins_mode_patch_ins_info (INS ins, VOID* data) -> VOID
 
 static auto trace_mode_patch_ins_info (TRACE trace, VOID* data) -> VOID
 {
-  (void)data;
+  static_cast<void>(data);
 
   for (auto bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl)) {
     for (auto ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins)) {
@@ -896,7 +898,7 @@ static auto trace_mode_patch_ins_info (TRACE trace, VOID* data) -> VOID
 
 static auto img_mode_get_ins_info (IMG img, VOID* data) -> VOID
 {
-  (void)data;
+  static_cast<void>(data);
 
   for (SEC sec = IMG_SecHead(img); SEC_Valid(sec); sec = SEC_Next(sec)) {
     for (RTN rtn = SEC_RtnHead(sec); RTN_Valid(rtn); rtn = RTN_Next(rtn)) {
@@ -1033,7 +1035,7 @@ auto pintool_add_register_modifying_point (ADDRINT ins_address, UINT32 exec_orde
 ins_instrumentation_t pintool_instruction_mode_get_instruction_info = ins_mode_get_ins_info;
 ins_instrumentation_t pintool_instruction_mode_patch_instruction_info = ins_mode_patch_ins_info;
 
-trace_instrumentation_t pintool_trace_mode_tracing = trace_mode_get_ins_info;
+trace_instrumentation_t pintool_trace_mode_tracing = trace_mode_get_instruction_information;
 trace_instrumentation_t pintool_trace_mode_modifying = trace_mode_patch_ins_info;
 
 img_instrumentation_t pintool_img_mode_get_instruction_info = img_mode_get_ins_info;

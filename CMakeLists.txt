@@ -51,12 +51,6 @@ set(PIN_LIBRARY_DIRS
   ${PIN_ROOT_DIR}/${PIN_CPU_ARCH_LONG}/lib-ext
   ${PIN_ROOT_DIR}/${PIN_CPU_ARCH_LONG}/runtime/pincrt)
 
-#set(SOURCES
-#  src/main.cpp
-#  src/lib/cap/tracer.cpp
-#  src/lib/cap/parser.cpp
-#  src/lib/type/instruction.cpp
-#  src/lib/type/trace.pb.cc)
 
 # Pintool sources
 set(PINTOOL_SRCS
@@ -68,13 +62,13 @@ set(PINTOOL_SRCS
   src/tracing/instruction.cpp
   src/tracing/trace_with_chunk.pb.cc)
 
-if((DEFINED FAST) AND (FAST STREQUAL "Yes"))
-  set(FAST_DEFS "/D FAST_TRACING")
-  message(STATUS "Fast tracing is enabled")
-else()
-  set(FAST_DEFS "")
-  message(STATUS "Fast tracing is disabled")
-endif()
+#if((DEFINED FAST) AND (FAST STREQUAL "Yes"))
+#  set(FAST_DEFS "/D FAST_TRACING")
+#  message(STATUS "Fast tracing is enabled")
+#else()
+#  set(FAST_DEFS "")
+#  message(STATUS "Fast tracing is disabled")
+#endif()
 
 # ========================================= start host configuration
 
@@ -108,16 +102,18 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 
   set(OTHER_LIBS libcpmt libcmt)
 
-  if(NOT DEFINED BOOST_ROOT_DIR)
-    message(FATAL_ERROR "\nBoost not found!\n"
-      "Please set the environment variable BOOST_ROOT_DIR to the base directory"
-      " of the Boost library.\n")
-  endif(NOT DEFINED BOOST_ROOT_DIR)
-  message(STATUS "BOOST_ROOT_DIR: ${BOOST_ROOT_DIR}")
+#  if(NOT DEFINED BOOST_ROOT_DIR)
+#    message(FATAL_ERROR "\nBoost not found!\n"
+#      "Please set the environment variable BOOST_ROOT_DIR to the base directory"
+#      " of the Boost library.\n")
+#  endif(NOT DEFINED BOOST_ROOT_DIR)
+#  message(STATUS "BOOST_ROOT_DIR: ${BOOST_ROOT_DIR}")
 
+#  set(INCLUDE_DIRS
+#    ${PIN_INCLUDE_DIRS}
+#    ${BOOST_ROOT_DIR})
   set(INCLUDE_DIRS
-    ${PIN_INCLUDE_DIRS}
-    ${BOOST_ROOT_DIR})
+    ${PIN_INCLUDE_DIRS})
 
   include_directories(${INCLUDE_DIRS} ${PROTOBUF_INCLUDE_DIRS})
   link_directories(${PIN_LIBRARY_DIRS} ${PROTOBUF_LIB_DIRS})
@@ -131,9 +127,9 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   set(CMAKE_CXX_FLAGS "${FUNC_DEFS} ${OTHER_DEFS} ${PIN_DEFS}")
   set(CMAKE_SHARED_LINKER_FLAGS "/DLL /EXPORT:main /NODEFAULTLIB /MACHINE:x86 /ENTRY:Ptrace_DllMainCRTStartup@12 /BASE:0x55000000")
 
-  add_library(vtrace SHARED ${PINTOOL_SRCS})
+  add_library(${PROJECT_NAME} SHARED ${PINTOOL_SRCS})
 #  add_library(vtrace ${SOURCES})
-  target_link_libraries(vtrace ${PIN_LIBS} ${OTHER_LIBS} ${PROTOBUF_LIBS})
+  target_link_libraries(${PROJECT_NAME} ${PIN_LIBS} ${OTHER_LIBS} ${PROTOBUF_LIBS})
 
 else()
 
@@ -172,14 +168,15 @@ else()
 
   set(PIN_LINKER_FLAGS "-Wl,--hash-style=sysv -Wl,-Bsymbolic -Wl,--version-script=${PIN_VERSION_SCRIPT}")
 
-  set(PIN_LINK_LIBS pin pinvm pinapp sapin xed pindwarf dwarf elf dl protobuf boost_system boost_filesystem)
-  # set(PIN_LINK_LIBS pin sapin pin3dwarf c-dynamic dl-dynamic m-dynamic protobuf)
+#  set(PIN_LINK_LIBS pin pinvm pinapp sapin xed pindwarf dwarf elf dl protobuf)
+   set(PIN_LINK_LIBS pin sapin pin3dwarf xed c-dynamic dl-dynamic m-dynamic protobuf)
+#  set(PIN_LINK_LIBS pin sapin pin3dwarf xed protobuf)
 
   link_directories(${PIN_LIBRARY_DIRS})
   include_directories(${PIN_INCLUDE_DIRS})
 
   # add Pintool
-  add_library(vtrace SHARED ${PINTOOL_SRCS})
+  add_library(${PROJECT_NAME} SHARED ${PINTOOL_SRCS})
 
   # set compile and link flags
   set_source_files_properties(${PINTOOL_SRCS} PROPERTIES
@@ -187,14 +184,14 @@ else()
     COMPILE_DEFINITIONS "${PIN_DEFINITIONS}")
 
   if (PIN_CPU_ARCH STREQUAL "intel64")
-    set_target_properties(vtrace PROPERTIES
+    set_target_properties(${PROJECT_NAME} PROPERTIES
       PREFIX ""
       SUFFIX ".pin_m64"
       COMPILE_DEFINITIONS "${PIN_DEFINITIONS}"
       COMPILE_FLAGS "${PIN_COMPILE_FLAGS}"
       LINK_FLAGS "${PIN_LINKER_FLAGS} -v")
   else()
-    set_target_properties(vtrace PROPERTIES
+    set_target_properties(${PROJECT_NAME} PROPERTIES
       PREFIX ""
       SUFFIX ".pin_m32"
       COMPILE_DEFINITIONS "${PIN_DEFINITIONS}"
@@ -202,6 +199,6 @@ else()
       LINK_FLAGS "${PIN_LINKER_FLAGS} -v -m32")
   endif()
 
-  target_link_libraries(vtrace ${PIN_LINK_LIBS})
+  target_link_libraries(${PROJECT_NAME} ${PIN_LINK_LIBS})
 endif()
 
