@@ -16,14 +16,20 @@
 
 using ins_callback_func_t = VOID(*)(INS ins, IPOINT ipoint, AFUNPTR funptr, ...);
 
-template <bool use_predicated_callback>
-ins_callback_func_t ins_insert_call;
+//template <bool use_predicated_callback>
+//ins_callback_func_t ins_insert_call;
 
-template <>
-static auto ins_insert_call<true> = INS_InsertPredicatedCall;
+//template <>
+//static auto ins_insert_call<true> = INS_InsertPredicatedCall;
 
-template <>
-static auto ins_insert_call<false> = INS_InsertCall;
+//template <>
+//static auto ins_insert_call<false> = INS_InsertCall;
+
+#if defined (USE_PREDICATED_TRACING)
+#define ins_insert_call INS_InsertPredicatedCall
+#else
+#define ins_insert_call INS_InsertCall
+#endif
 
 enum tracing_state_t
 {
@@ -464,27 +470,27 @@ static auto update_condition_before_handling (INS ins) -> void
                 decltype(update_condition<ANY_TO_DISABLE>), VOID (ADDRINT, UINT32)
                 >::value, "invalid callback function type");
 
-  ins_insert_call<false>(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<ANY_TO_DISABLE>),
+  ins_insert_call(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<ANY_TO_DISABLE>),
                         IARG_INST_PTR,
                         IARG_THREAD_ID,
                         IARG_END);
 
-  ins_insert_call<false>(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<ANY_TO_TERMINATE>),
+  ins_insert_call(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<ANY_TO_TERMINATE>),
                         IARG_INST_PTR,
                         IARG_THREAD_ID,
                         IARG_END);
 
-  ins_insert_call<false>(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<ENABLE_TO_SUSPEND>),
+  ins_insert_call(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<ENABLE_TO_SUSPEND>),
                         IARG_INST_PTR,
                         IARG_THREAD_ID,
                         IARG_END);
 
-  ins_insert_call<false>(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<NOT_START_TO_ENABLE>),
+  ins_insert_call(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<NOT_START_TO_ENABLE>),
                         IARG_INST_PTR,
                         IARG_THREAD_ID,
                         IARG_END);
 
-  ins_insert_call<false>(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<SUSPEND_TO_ENABLE>),
+  ins_insert_call(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<SUSPEND_TO_ENABLE>),
                         IARG_INST_PTR,
                         IARG_THREAD_ID,
                         IARG_END);
@@ -508,7 +514,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
   if (current_ins->is_call) {
     static_assert(std::is_same<decltype (update_skip_addresses), VOID (ADDRINT, ADDRINT)>::value, "invalid callback function type");
 
-    ins_insert_call<false>(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_skip_addresses),
+    ins_insert_call(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_skip_addresses),
                            IARG_INST_PTR,
                            IARG_BRANCH_TARGET_ADDR,
                            IARG_END);
@@ -519,7 +525,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
     // we must always verify whether there is a new execution thread or not
     static_assert(std::is_same<decltype(update_condition<NEW_THREAD>), VOID (ADDRINT, THREADID)>::value, "invalid callback function type");
 
-    ins_insert_call<false>(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<NEW_THREAD>),
+    ins_insert_call(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(update_condition<NEW_THREAD>),
                            IARG_INST_PTR,
                            IARG_THREAD_ID,
                            IARG_END);
@@ -541,7 +547,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
           != std::end(caller_skip_addresses)) {
         static_assert(std::is_same<decltype(update_resume_address), VOID (ADDRINT, UINT32)>::value, "invalid callback function type");
 
-        ins_insert_call<false>(ins,
+        ins_insert_call(ins,
                                IPOINT_BEFORE,
                                reinterpret_cast<AFUNPTR>(update_resume_address),
                                IARG_ADDRINT, current_ins->next_address,
@@ -549,7 +555,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
                                IARG_END);
       }
 
-      ins_insert_call<false>(ins,
+      ins_insert_call(ins,
                              IPOINT_BEFORE,
                              reinterpret_cast<AFUNPTR>(remove_previous_instruction),
                              IARG_THREAD_ID,
@@ -571,7 +577,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
                   "invalid callback function type");
 
     // ATTENTION: this function can change the inserted instrumentation functions
-    ins_insert_call<false>(ins,
+    ins_insert_call(ins,
                            IPOINT_BEFORE,
                            reinterpret_cast<AFUNPTR>(reinstrument_because_of_suspended_state),
                            IARG_CONST_CONTEXT,
@@ -591,7 +597,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
       static_assert(std::is_same<decltype(initialize_instruction), VOID (ADDRINT, UINT32)>::value,
                     "invalid callback function type");
 
-      ins_insert_call<false>(ins,                                               // instrumented instruction
+      ins_insert_call(ins,                                               // instrumented instruction
                              IPOINT_BEFORE,                                     // instrumentation point
                              reinterpret_cast<AFUNPTR>(initialize_instruction), // callback analysis function
                              IARG_INST_PTR,                                     // instruction address
@@ -602,7 +608,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
         static_assert(std::is_same<decltype(save_register<READ>), VOID (const CONTEXT*, UINT32)>::value,
                       "invalid callback function type");
 
-        ins_insert_call<false>(ins,                                            // instrumented instruction
+        ins_insert_call(ins,                                            // instrumented instruction
                                IPOINT_BEFORE,                                  // instrumentation point
                                reinterpret_cast<AFUNPTR>(save_register<READ>), // callback analysis function
                                IARG_CONST_CONTEXT,                             // context of CPU,
@@ -611,7 +617,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
       }
 
       if (!current_ins->dst_registers.empty()) {
-        ins_insert_call<false>(ins,
+        ins_insert_call(ins,
                                IPOINT_AFTER,
                                reinterpret_cast<AFUNPTR>(save_register<WRITE>),
                                IARG_CONST_CONTEXT,
@@ -622,7 +628,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
       if (current_ins->is_memory_read) {
         static_assert(std::is_same<decltype(save_memory<READ>), VOID (ADDRINT, UINT32, UINT32)>::value, "invalid callback function type");
 
-        ins_insert_call<false>(ins,                                          // instrumented instruction
+        ins_insert_call(ins,                                          // instrumented instruction
                                IPOINT_BEFORE,                                // instrumentation point
                                reinterpret_cast<AFUNPTR>(save_memory<READ>), // callback analysis function (read)
                                IARG_MEMORYREAD_EA, IARG_MEMORYREAD_SIZE,     // memory read (address, size)
@@ -631,7 +637,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
       }
 
       if (current_ins->is_memory_read2) {
-        ins_insert_call<false>(ins,                                          // instrumented instruction
+        ins_insert_call(ins,                                          // instrumented instruction
                                IPOINT_BEFORE,                                // instrumentation point
                                reinterpret_cast<AFUNPTR>(save_memory<READ>), // callback analysis function (read)
                                IARG_MEMORYREAD2_EA, IARG_MEMORYREAD_SIZE,    // memory read (address, size)
@@ -640,7 +646,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
       }
 
       if (current_ins->is_memory_write) {
-        ins_insert_call<false>(ins,                                           // instrumented instruction
+        ins_insert_call(ins,                                           // instrumented instruction
                                IPOINT_AFTER,                                  // instrumentation point
                                reinterpret_cast<AFUNPTR>(save_memory<WRITE>), // callback analysis function (write)
                                IARG_MEMORYWRITE_EA, IARG_MEMORYWRITE_SIZE,    // memory written (address, size)
@@ -653,7 +659,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
        */
       static_assert(std::is_same<decltype(add_instruction_into_trace), VOID (ADDRINT, UINT32)>::value, "invalid callback function type");
 
-      ins_insert_call<false>(ins, IPOINT_AFTER, reinterpret_cast<AFUNPTR>(add_instruction_into_trace),
+      ins_insert_call(ins, IPOINT_AFTER, reinterpret_cast<AFUNPTR>(add_instruction_into_trace),
                              IARG_INST_PTR,
                              IARG_THREAD_ID,
                              IARG_END);
@@ -674,7 +680,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
         static_assert(std::is_same<decltype(reinstrument_if_some_thread_started), VOID (ADDRINT, ADDRINT, const CONTEXT*)>::value,
                       "invalid callback function type");
 
-        ins_insert_call<false>(ins,
+        ins_insert_call(ins,
                                IPOINT_BEFORE,
                                reinterpret_cast<AFUNPTR>(reinstrument_if_some_thread_started),
                                IARG_INST_PTR,
@@ -684,7 +690,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
       }
       else {
         if (current_ins->is_ret) {
-          ins_insert_call<false>(ins,
+          ins_insert_call(ins,
                                  IPOINT_BEFORE,
                                  reinterpret_cast<AFUNPTR>(reinstrument_if_some_thread_started),
                                  IARG_INST_PTR,
@@ -696,7 +702,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
           static_assert(std::is_same<decltype(reinstrument_if_some_thread_started), VOID (ADDRINT, ADDRINT, const CONTEXT*)>::value,
                         "invalid callback function type");
 
-          ins_insert_call<false>(ins,
+          ins_insert_call(ins,
                                  IPOINT_BEFORE,
                                  reinterpret_cast<AFUNPTR>(reinstrument_if_some_thread_started),
                                  IARG_INST_PTR,
@@ -740,7 +746,7 @@ static auto insert_ins_patch_info_callbacks (INS ins) -> void
       static_assert(std::is_same<decltype(update_execution_order), VOID (ADDRINT, UINT32)>::value,
                     "invalid callback function type");
 
-      ins_insert_call<false>(ins,                                               // instrumented instruction
+      ins_insert_call(ins,                                               // instrumented instruction
                              IPOINT_BEFORE,                                     // instrumentation point
                              reinterpret_cast<AFUNPTR>(update_execution_order), // callback analysis function
                              IARG_INST_PTR,                                     // instruction address
@@ -767,7 +773,7 @@ static auto insert_ins_patch_info_callbacks (INS ins) -> void
               static_assert(std::is_same<decltype(patch_register), VOID (ADDRINT, bool, UINT32, PIN_REGISTER*, UINT32)>::value,
                             "invalid callback function type");
 
-              ins_insert_call<false>(ins,                                       // instrumented instruction
+              ins_insert_call(ins,                                       // instrumented instruction
                                      pin_patch_point,                           // instrumentation point
                                      reinterpret_cast<AFUNPTR>(patch_register), // callback analysis function
                                      IARG_INST_PTR,                             // instruction address
@@ -799,7 +805,7 @@ static auto insert_ins_patch_info_callbacks (INS ins) -> void
             static_assert(std::is_same<decltype(patch_memory), VOID (ADDRINT, bool, ADDRINT, UINT32)>::value,
                           "invalid callback function type");
 
-            ins_insert_call<false>(ins,                                     // instrumented instruction
+            ins_insert_call(ins,                                     // instrumented instruction
                                    pin_patch_point,                         // instrumentation point
                                    reinterpret_cast<AFUNPTR>(patch_memory), // callback analysis function
                                    IARG_INST_PTR,                           // instruction address

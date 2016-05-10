@@ -70,6 +70,13 @@ set(PINTOOL_SRCS
 #  message(STATUS "Fast tracing is disabled")
 #endif()
 
+if(DEFINED USE_PREDICATED_TRACING)
+  set(TRACING_DEFS "/D USE_PREDICATED_TRACING")
+  message(STATUS "Use predicated instrumentation")
+else()
+  message(STATUS "Use default instrumentation")
+endif()
+
 # ========================================= start host configuration
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
@@ -121,7 +128,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   add_definitions(${PIN_DEFS})
   add_definitions(${LINKER_DEFS})
   add_definitions(${PROTOBUF_DEFS})
-  add_definitions(${FAST_DEFS})
+#  add_definitions(${FAST_DEFS})
 #  add_definitions(${FUNC_DEFS})
 
   set(CMAKE_CXX_FLAGS "${FUNC_DEFS} ${OTHER_DEFS} ${PIN_DEFS}")
