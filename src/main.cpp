@@ -6,6 +6,7 @@
 
 #include "json.hpp"
 
+#include <list>
 #include <fstream>
 #include <algorithm>
 #include <exception>
@@ -60,13 +61,27 @@ auto parse_configuration (const std::string& filename) -> void
   tfm::printfln("parse configuration from file: %s", filename);
 
   // parse "start/stop" addresses
-  std::string start_address_str = config_json["start"];
-  auto start_address = static_cast<ADDRINT>(std::stoul(start_address_str, 0, 0));
-  tfm::printfln("start address: 0x%x", start_address);
+  auto start_address = ADDRINT{0};
+  try {
+    std::string start_address_str = config_json["start"];
+    start_address = static_cast<ADDRINT>(std::stoul(start_address_str, 0, 0));
+    tfm::printfln("start address: 0x%x", start_address);
+  }
+  catch(...) {
+    tfm::printfln("cannot parse start address, assign by default value: 0x0");
+    start_address = 0x0;
+  }
 
-  std::string stop_address_str = config_json["stop"];
-  auto stop_address = static_cast<ADDRINT>(std::stoul(stop_address_str, 0, 0));
-  tfm::printfln("stop address: 0x%x", stop_address);
+  auto stop_address = ADDRINT{0};
+  try {
+    std::string stop_address_str = config_json["stop"];
+    stop_address = static_cast<ADDRINT>(std::stoul(stop_address_str, 0, 0));
+    tfm::printfln("stop address: 0x%x", stop_address);
+  }
+  catch(...) {
+    tfm::printfln("cannot parse stop address, assign by default value: 0x0");
+    stop_address = 0x0;
+  }
 
   pintool_set_start_address(start_address);
   pintool_set_stop_address(stop_address);
@@ -86,15 +101,23 @@ auto parse_configuration (const std::string& filename) -> void
   pintool_set_chunk_size(chunk_size);
 
   // parse "skip" entries
-  auto skip_entries = std::vector<nlohmann::json>{config_json["skip"]};
+  std::list<nlohmann::json> skip_entries = config_json["skip"];
+//  tfm::printfln("%d", skip_entries.size());
   for (const auto& skip_elem : skip_entries) {
     std::string skip_type = skip_elem["type"];
 
-    auto skip_address = ADDRINT{skip_elem["address"]};
+    std::string skip_address_str = skip_elem["address"];
+    auto skip_address = static_cast<ADDRINT>(std::stoul(skip_address_str, 0, 0));
 
-    if (skip_type == "caller") pintool_add_caller_skip_address(skip_address);
-    else if (skip_type == "callee") pintool_add_callee_skip_addresses(skip_address);
-    else throw std::logic_error("type of skip must be either \"caller\" or \"callee\"");
+    if (skip_type == "caller") {
+      pintool_add_caller_skip_address(skip_address);
+      tfm::printfln("add caller skip at address: 0x%x", skip_address);
+    }
+    else if (skip_type == "callee") {
+      pintool_add_callee_skip_addresses(skip_address);
+      tfm::printfln("add callee skip for address: 0x%x", skip_address);
+    }
+    else throw std::logic_error("type of skip must be either \"caller\" or \"callee\"");   
   }
 
   // parse "modify" entries
