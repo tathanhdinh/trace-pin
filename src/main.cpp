@@ -19,17 +19,17 @@
 /*====================================================================================================================*/
 
 
-static KNOB<uint32_t> trace_length_knob          (KNOB_MODE_WRITEONCE, "pintool", "length", "10000", "length of trace");
+static KNOB<ADDRINT> skip_full_address_knob (KNOB_MODE_APPEND, "pintool", "skip-full", "0x0", "skipping call address");
 
-static KNOB<ADDRINT> skip_full_address_knob      (KNOB_MODE_APPEND, "pintool", "skip-full", "0x0", "skipping call address");
+static KNOB<ADDRINT> skip_auto_address_knob (KNOB_MODE_APPEND, "pintool", "skip-auto", "0x0", "skipping called address");
 
-static KNOB<ADDRINT> skip_auto_address_knob      (KNOB_MODE_APPEND, "pintool", "skip-auto", "0x0", "skipping called address");
+static KNOB<uint32_t> trace_length_knob     (KNOB_MODE_WRITEONCE, "pintool", "length", "10000", "length of trace");
 
-static KNOB<UINT32> loop_count_knob              (KNOB_MODE_WRITEONCE, "pintool", "loop-count", "1", "loop count");
+static KNOB<UINT32> loop_count_knob         (KNOB_MODE_WRITEONCE, "pintool", "loop-count", "1", "loop count");
 
-static KNOB<string> config_file                  (KNOB_MODE_WRITEONCE, "pintool", "conf", "", "configuration file, for parameterized analysis");
+static KNOB<string> config_file             (KNOB_MODE_WRITEONCE, "pintool", "conf", "", "configuration file, for parameterized analysis");
 
-static KNOB<string> output_file                  (KNOB_MODE_WRITEONCE, "pintool", "out", "", "output file, for resulted trace");
+static KNOB<string> output_file             (KNOB_MODE_WRITEONCE, "pintool", "out", "", "output file, for resulted trace");
 
 
 /*====================================================================================================================*/
@@ -57,13 +57,16 @@ auto parse_configuration (const std::string& filename) -> void
   if (!config_file.is_open()) throw std::logic_error("cannot open configuration file");
 
   nlohmann::json config_json; config_file >> config_json;
+  tfm::printfln("parse configuration from file: %s", filename);
 
   // parse "start/stop" addresses
   std::string start_address_str = config_json["start"];
   auto start_address = static_cast<ADDRINT>(std::stoul(start_address_str, 0, 0));
+  tfm::printfln("start address: 0x%x", start_address);
 
   std::string stop_address_str = config_json["stop"];
   auto stop_address = static_cast<ADDRINT>(std::stoul(stop_address_str, 0, 0));
+  tfm::printfln("stop address: 0x%x", stop_address);
 
   pintool_set_start_address(start_address);
   pintool_set_stop_address(stop_address);
@@ -71,12 +74,14 @@ auto parse_configuration (const std::string& filename) -> void
   // parse "limit trace length"
   std::string limit_length_str = config_json["limit_length"];
   auto limit_length = static_cast<ADDRINT>(std::stoul(limit_length_str, 0, 0));
+  tfm::printfln("limit length: %d%s", limit_length, limit_length == 0 ? " (no limit)" : "");
 
   pintool_set_trace_limit_length(limit_length);
 
   // parse "chunk size"
   std::string chunk_size_str = config_json["chunk_size"];
   auto chunk_size = static_cast<ADDRINT>(std::stoul(chunk_size_str, 0, 0));
+  tfm::printfln("chunk size: %d", chunk_size);
 
   pintool_set_chunk_size(chunk_size);
 
@@ -135,6 +140,9 @@ auto parse_configuration (const std::string& filename) -> void
 }
 
 
+/*
+ * Try to get the name of the binary from Pin's command line
+ */
 auto get_application_name (int argc, char* argv[]) -> std::string
 {
   auto i = int{0};
@@ -144,7 +152,10 @@ auto get_application_name (int argc, char* argv[]) -> std::string
 }
 
 
-auto load_configuration_and_options (int argc, char* argv[]) -> void
+/*
+ * Load Pintool's configuration from json file
+ */
+auto load_configuration (int argc, char* argv[]) -> void
 {
   auto app_name = get_application_name(argc, argv);
 
@@ -168,9 +179,15 @@ auto load_configuration_and_options (int argc, char* argv[]) -> void
   }
   pintool_initialize_trace_file(output_filename);
 
+  std::terminate();
+
   return;
 }
 
+
+/*
+ * Callback will be called before Pintool stops
+ */
 auto stop_pin (INT32 code, VOID* data) -> VOID
 {
   static_cast<void>(code); static_cast<void>(data);
@@ -245,7 +262,7 @@ auto main(int argc, char* argv[]) -> int
     tfm::format(std::cerr, "initialize Pin successfully...\n");
 
     tfm::format(std::cerr, "load configuration and options...\n");
-    load_configuration_and_options(argc, argv);
+    load_configuration(argc, argv);
 
 //    tfm::printfln("add start function...");
 //    PIN_AddApplicationStartFunction(load_configuration_and_options, UNUSED_DATA);

@@ -168,15 +168,15 @@ else()
   set(PIN_VERSION_SCRIPT ${PIN_ROOT_DIR}/source/include/pin/pintool.ver)
 
   if (PIN_CPU_ARCH STREQUAL "intel64")
-    set(PIN_COMPILE_FLAGS "-Wall -Wno-unknown-pragmas -std=c++11 -MMD -O3 -fomit-frame-pointer -fno-strict-aliasing -fno-stack-protector")
+    set(PIN_COMPILE_FLAGS "-Wall -Wno-unknown-pragmas -std=c++11 -MMD -O3 -fomit-frame-pointer -fno-strict-aliasing -fno-stack-protector -fabi-version=2")
   else()
-    set(PIN_COMPILE_FLAGS "-Wall -Wno-unknown-pragmas -std=c++11 -m32 -MMD -O3 -fomit-frame-pointer -fno-strict-aliasing -fno-stack-protector")
+    set(PIN_COMPILE_FLAGS "-Wall -Wno-unknown-pragmas -std=c++11 -m32 -MMD -O3 -fomit-frame-pointer -fno-strict-aliasing -fno-stack-protector -fabi-version=2")
   endif()
 
   set(PIN_LINKER_FLAGS "-Wl,--hash-style=sysv -Wl,-Bsymbolic -Wl,--version-script=${PIN_VERSION_SCRIPT}")
 
-#  set(PIN_LINK_LIBS pin pinvm pinapp sapin xed pindwarf dwarf elf dl protobuf)
-   set(PIN_LINK_LIBS pin sapin pin3dwarf xed c-dynamic dl-dynamic m-dynamic protobuf)
+  set(PIN_LINK_LIBS pin pinvm pinapp sapin xed pindwarf dwarf elf dl protobuf)
+#  set(PIN_LINK_LIBS pin sapin pin3dwarf xed c-dynamic dl-dynamic m-dynamic stlport-dynamic protobuf)
 #  set(PIN_LINK_LIBS pin sapin pin3dwarf xed protobuf)
 
   link_directories(${PIN_LIBRARY_DIRS})
