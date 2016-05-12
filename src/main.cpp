@@ -58,7 +58,7 @@ auto parse_configuration (const std::string& filename) -> void
   if (!config_file.is_open()) throw std::logic_error("cannot open configuration file");
 
   nlohmann::json config_json; config_file >> config_json;
-  tfm::printfln("parse configuration from file: %s", filename);
+//  tfm::printfln("parse configuration from file: %s", filename);
 
   // parse "start/stop" addresses
   auto start_address = ADDRINT{0};
@@ -68,9 +68,10 @@ auto parse_configuration (const std::string& filename) -> void
     tfm::printfln("start address: 0x%x", start_address);
   }
   catch(...) {
-    tfm::printfln("cannot parse start address, assign by default value: 0x0");
+    tfm::printfln("cannot parse start address, assign by the default value: 0x0");
     start_address = 0x0;
   }
+  pintool_set_start_address(start_address);
 
   auto stop_address = ADDRINT{0};
   try {
@@ -79,84 +80,103 @@ auto parse_configuration (const std::string& filename) -> void
     tfm::printfln("stop address: 0x%x", stop_address);
   }
   catch(...) {
-    tfm::printfln("cannot parse stop address, assign by default value: 0x0");
+    tfm::printfln("cannot parse stop address, assign by the default value: 0x0");
     stop_address = 0x0;
   }
-
-  pintool_set_start_address(start_address);
   pintool_set_stop_address(stop_address);
 
   // parse "limit trace length"
-  std::string limit_length_str = config_json["limit_length"];
-  auto limit_length = static_cast<ADDRINT>(std::stoul(limit_length_str, 0, 0));
-  tfm::printfln("limit length: %d%s", limit_length, limit_length == 0 ? " (no limit)" : "");
-
+  auto limit_length = uint32_t{0};
+  try {
+    std::string limit_length_str = config_json["limit_length"];
+    limit_length = static_cast<ADDRINT>(std::stoul(limit_length_str, 0, 0));
+    tfm::printfln("limit length: %d%s", limit_length, limit_length == 0 ? " (no limit)" : "");
+  }
+  catch(...) {
+    tfm::printfln("cannot parse limit length, assign by the default value: 0x0");
+    limit_length = 0;
+  }
   pintool_set_trace_limit_length(limit_length);
 
   // parse "chunk size"
-  std::string chunk_size_str = config_json["chunk_size"];
-  auto chunk_size = static_cast<ADDRINT>(std::stoul(chunk_size_str, 0, 0));
-  tfm::printfln("chunk size: %d", chunk_size);
-
+  auto chunk_size = uint32_t{0};
+  try {
+    std::string chunk_size_str = config_json["chunk_size"];
+    chunk_size = static_cast<uint32_t>(std::stoul(chunk_size_str, 0, 0));
+    tfm::printfln("chunk size: %d", chunk_size);
+  }
+  catch(...) {
+    tfm::printfln("cannot parse chunk size, assign by the default value: 5000 instructions");
+    chunk_size = 5000;
+  }
   pintool_set_chunk_size(chunk_size);
 
   // parse "skip" entries
-  std::list<nlohmann::json> skip_entries = config_json["skip"];
-//  tfm::printfln("%d", skip_entries.size());
-  for (const auto& skip_elem : skip_entries) {
-    std::string skip_type = skip_elem["type"];
+  try {
+    std::list<nlohmann::json> skip_entries = config_json["skip"];
+    for (const auto& skip_elem : skip_entries) {
+      std::string skip_type = skip_elem["type"];
 
-    std::string skip_address_str = skip_elem["address"];
-    auto skip_address = static_cast<ADDRINT>(std::stoul(skip_address_str, 0, 0));
+      std::string skip_address_str = skip_elem["address"];
+      auto skip_address = static_cast<ADDRINT>(std::stoul(skip_address_str, 0, 0));
 
-    if (skip_type == "caller") {
-      pintool_add_caller_skip_address(skip_address);
-      tfm::printfln("add caller skip at address: 0x%x", skip_address);
+      if (skip_type == "caller") {
+        pintool_add_caller_skip_address(skip_address);
+        tfm::printfln("add caller skip at address: 0x%x", skip_address);
+      }
+      else if (skip_type == "callee") {
+        pintool_add_callee_skip_addresses(skip_address);
+        tfm::printfln("add callee skip for address: 0x%x", skip_address);
+      }
+      else throw std::logic_error("type of skip must be either \"caller\" or \"callee\"");
     }
-    else if (skip_type == "callee") {
-      pintool_add_callee_skip_addresses(skip_address);
-      tfm::printfln("add callee skip for address: 0x%x", skip_address);
-    }
-    else throw std::logic_error("type of skip must be either \"caller\" or \"callee\"");   
+  }
+  catch(...) {
+    tfm::printfln("errors in parsing \"skip\" entries");
   }
 
   // parse "modify" entries
-  auto modify_entries = std::vector<nlohmann::json>{config_json["modify"]};
-  for (const auto& modify_elem : modify_entries) {
-    std::string location_address_str = modify_elem["location"]["address"];
-    auto location_address = static_cast<ADDRINT>(std::stoul(location_address_str, 0, 0));
+  try {
+    auto modify_entries = std::vector<nlohmann::json>{config_json["modify"]};
+    for (const auto& modify_elem : modify_entries) {
+      std::string location_address_str = modify_elem["location"]["address"];
+      auto location_address = static_cast<ADDRINT>(std::stoul(location_address_str, 0, 0));
 
-    std::string location_order_str = modify_elem["location"]["order"];
-    auto location_order = static_cast<ADDRINT>(std::stoul(location_order_str, 0, 0));
+      std::string location_order_str = modify_elem["location"]["order"];
+      auto location_order = static_cast<ADDRINT>(std::stoul(location_order_str, 0, 0));
 
-    std::string location_position_str = modify_elem["location"]["position"];
-    auto location_position = bool{false};
-    if (location_position_str == "before") location_position = false;
-    else if (location_position_str == "after") location_position = true;
-    else throw std::logic_error("position of modification must be either \"before\" or \"after\"");
+      std::string location_position_str = modify_elem["location"]["position"];
+      auto location_position = bool{false};
+      if (location_position_str == "before") location_position = false;
+      else if (location_position_str == "after") location_position = true;
+      else throw std::logic_error("position of modification must be either \"before\" or \"after\"");
 
-    nlohmann::json target_entries = modify_elem["targets"];
-    for (const auto& target_elem : target_entries) {
-      std::string target_type_str = target_elem["type"];
-      if (target_type_str == "register") {
-        std::string target_register_str = target_elem["name"];
-        auto modif_reg = get_pin_register_from_name(target_register_str);
+      nlohmann::json target_entries = modify_elem["targets"];
+      for (const auto& target_elem : target_entries) {
+        std::string target_type_str = target_elem["type"];
+        if (target_type_str == "register") {
+          std::string target_register_str = target_elem["name"];
+          auto modif_reg = get_pin_register_from_name(target_register_str);
 
-        std::string target_value_str = target_elem["value"];
-        auto modif_value = static_cast<ADDRINT>(std::stoul(target_value_str, 0, 0));
+          std::string target_value_str = target_elem["value"];
+          auto modif_value = static_cast<ADDRINT>(std::stoul(target_value_str, 0, 0));
 
-        pintool_add_register_modifying_point(location_address, location_order, location_position, modif_reg, modif_value);
-      }
-      else if (target_type_str == "memory") {
-        std::string target_memory_str = target_elem["address"];
-        auto modif_mem = static_cast<ADDRINT>(std::stoul(target_memory_str, 0, 0));
+          pintool_add_register_modifying_point(location_address, location_order, location_position, modif_reg, modif_value);
+        }
+        else if (target_type_str == "memory") {
+          std::string target_memory_str = target_elem["address"];
+          auto modif_mem = static_cast<ADDRINT>(std::stoul(target_memory_str, 0, 0));
 
-        std::string target_value_str = target_elem["value"];
-        auto modif_value = static_cast<ADDRINT>(std::stoul(target_value_str, 0, 0));
+          std::string target_value_str = target_elem["value"];
+          auto modif_value = static_cast<ADDRINT>(std::stoul(target_value_str, 0, 0));
 
-        pintool_add_memory_modifying_point(location_address, location_order, location_position, modif_mem, modif_value);
+          pintool_add_memory_modifying_point(location_address, location_order, location_position, modif_mem, modif_value);
+        }
       }
     }
+  }
+  catch(...) {
+    tfm::printfln("error in parsing \"modify\" entries");
   }
 
   return;
@@ -201,8 +221,6 @@ auto load_configuration (int argc, char* argv[]) -> void
     tfm::printfln("the output filename is empty, try to guess it from the application name: %s", output_filename);
   }
   pintool_initialize_trace_file(output_filename);
-
-  std::terminate();
 
   return;
 }
@@ -308,8 +326,8 @@ auto main(int argc, char* argv[]) -> int
     PIN_AddFiniFunction(stop_pin, UNUSED_DATA);
 //    PIN_AddDetachFunction(detach_pin, UNUSED_DATA);
 
-    tfm::format(std::cerr, "add follow process function\n");
-    PIN_AddFollowChildProcessFunction(proc_follow_process, UNUSED_DATA);
+//    tfm::format(std::cerr, "add follow process function\n");
+//    PIN_AddFollowChildProcessFunction(proc_follow_process, UNUSED_DATA);
 
     tfm::format(std::cerr, "pass control to Pin...\n");
     PIN_StartProgram();
