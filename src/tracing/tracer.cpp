@@ -66,7 +66,7 @@ dynamic_instructions_t trace                             = dynamic_instructions_
 address_instruction_map_t cached_instruction_at_address = address_instruction_map_t();
 
 static auto state_of_thread          = std::map<THREADID, tracing_state_t>();
-static auto instruction_at_thread            = std::map<THREADID, dyn_instruction_t>();
+static auto instruction_at_thread    = std::map<THREADID, dyn_instruction_t>();
 static auto resume_address_of_thread = std::map<THREADID, ADDRINT>();
 
 static auto start_address = ADDRINT{0};
@@ -288,7 +288,7 @@ static auto save_register (const CONTEXT* p_context, THREADID thread_id) -> void
     auto ins_addr = std::get<INS_ADDRESS>(instruction_at_thread[thread_id]);
     const auto & current_ins = cached_instruction_at_address[ins_addr];
 
-    if ((state_of_thread[thread_id] == ENABLED) && !current_ins->is_special) {
+    if (state_of_thread[thread_id] == ENABLED) {
 
       const auto & regs = read_or_write == REG_READ ? current_ins->src_registers : current_ins->dst_registers;
 
@@ -334,6 +334,26 @@ static auto save_memory_store (ADDRINT mem_addr, UINT32 mem_size, THREADID threa
 }
 
 
+static inline auto add_current_instruction_of_thread_into_trace(THREADID thread_id) -> void
+{
+  trace.push_back(instruction_at_thread[thread_id]);
+  instruction_at_thread.erase(thread_id);
+
+  if (trace.size() >= chunk_size) {
+      current_trace_length += trace.size();
+
+      if (current_trace_length >= limit_trace_length && limit_trace_length > 0) {
+        tfm::format(std::cerr, "stop tracing since trace limit length %d is exceed\n", limit_trace_length);
+
+        PIN_ExitApplication(1);
+      }
+
+      pintool_flush_trace();
+  }
+
+  return;
+}
+
 static auto add_instruction_into_trace (ADDRINT ins_addr, THREADID thread_id) -> void
 {
   static_cast<void>(ins_addr);
@@ -342,6 +362,7 @@ static auto add_instruction_into_trace (ADDRINT ins_addr, THREADID thread_id) ->
   // auto should_add_noncached_instruction = !is_cached && state_of_thread[thread_id] == ENABLED;
 
   if (state_of_thread[thread_id] == ENABLED) {
+    // memory store
     auto& mem_store_map = std::get<INS_STORE_MEMS>(instruction_at_thread[thread_id]);
     for (auto& mem_val : mem_store_map) {
       auto byte_buffer = uint8_t{0};
@@ -349,20 +370,8 @@ static auto add_instruction_into_trace (ADDRINT ins_addr, THREADID thread_id) ->
       std::get<1>(mem_val) = byte_buffer;
     }
 
-    trace.push_back(instruction_at_thread[thread_id]);
-    instruction_at_thread.erase(thread_id);
+    add_current_instruction_of_thread_into_trace(thread_id);
 
-    if (trace.size() >= chunk_size) {
-        current_trace_length += trace.size();
-
-        if (current_trace_length >= limit_trace_length) {
-          tfm::format(std::cerr, "stop tracing since trace limit length %d is exceed\n", limit_trace_length);
-
-          PIN_ExitApplication(1);
-        }
-
-        pintool_flush_trace();
-      }
   }
 
   return;
@@ -372,19 +381,31 @@ static auto add_instruction_into_trace (ADDRINT ins_addr, THREADID thread_id) ->
 static auto add_cached_instruction_into_trace (const CONTEXT* p_context, THREADID thread_id) -> void
 {
   if (instruction_at_thread.find(thread_id) != std::end(instruction_at_thread)) {
+    // memory store
+    auto& mem_store_map = std::get<INS_STORE_MEMS>(instruction_at_thread[thread_id]);
+    for (auto& mem_val : mem_store_map) {
+      auto byte_buffer = uint8_t{0};
+      PIN_SafeCopy(&byte_buffer, reinterpret_cast<void*>(std::get<0>(mem_val)), 1);
+      std::get<1>(mem_val) = byte_buffer;
+    }
 
+    // register write
+    auto ins_addr = std::get<INS_ADDRESS>(instruction_at_thread[thread_id]);
+    const auto & static_ins = cached_instruction_at_address[ins_addr];
+
+    const auto & regs = static_ins->dst_registers;
+    auto & reg_map = std::get<INS_WRITE_REGS>(instruction_at_thread[thread_id]);
+
+    for (auto const & reg : regs) {
+      PIN_REGISTER value_of_reg;
+      PIN_GetContextRegval(p_context, reg, reinterpret_cast<uint8_t*>(&value_of_reg));
+      reg_map[reg] = value_of_reg;
+    }
+
+    add_current_instruction_of_thread_into_trace(thread_id);
   }
   return;
 }
-
-
-//static auto remove_previous_instruction (THREADID thread_id) -> void
-//{
-//  if (instruction_at_thread.find(thread_id) != instruction_at_thread.end()) {
-//    instruction_at_thread.erase(thread_id);
-//  }
-//  return;
-//}
 
 
 static auto update_execution_order (ADDRINT ins_addr, THREADID thread_id) -> void
@@ -539,12 +560,12 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
                     IARG_END);
   }
 
-    static_assert(std::is_same<decltype(add_instruction_into_trace), VOID (ADDRINT, UINT32)>::value, "invalid callback function type");
+  static_assert(std::is_same<decltype(add_cached_instruction_into_trace), VOID (const CONTEXT*, UINT32)>::value, "invalid callback function type");
 
-    ins_insert_call(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(add_instruction_into_trace),
-                    IARG_INST_PTR,
-                    IARG_THREAD_ID,
-                    IARG_END);
+  ins_insert_call(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(add_cached_instruction_into_trace),
+                  IARG_CONST_CONTEXT,
+                  IARG_THREAD_ID,
+                  IARG_END);
 
   if (some_thread_is_started) {
     // we must always verify whether there is a new execution thread or not

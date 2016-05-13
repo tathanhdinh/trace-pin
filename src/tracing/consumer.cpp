@@ -136,34 +136,6 @@ static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, const dyn_
 }
 
 
-auto flush_trace_in_protobuf_format () -> void
-{
-  if (!trace.empty()) {
-    tfm::format(std::cerr, "flush %d instructions\n", trace.size());
-
-    current_trace_length += trace.size();
-
-    // add instructions
-    for (auto& ins : trace) {
-      add_instruction_into_chunk(protobuf_chunk, ins);
-    }
-
-    auto chunk_size = protobuf_chunk.ByteSize();
-    auto chunk_buffer = std::shared_ptr<char>(new char[chunk_size], std::default_delete<char[]>());
-
-    protobuf_chunk.SerializeToArray(chunk_buffer.get(), chunk_size);
-
-    protobuf_trace_file.write(reinterpret_cast<const char*>(&chunk_size), sizeof(decltype(chunk_size)));
-    protobuf_trace_file.write(chunk_buffer.get(), chunk_size);
-
-    trace.clear();
-    protobuf_chunk.Clear();
-  }
-
-  return;
-}
-
-
 /*====================================================================================================================*/
 /*                                                     exported functions                                             */
 /*====================================================================================================================*/
@@ -183,10 +155,30 @@ auto pintool_initialize_trace_file (const std::string& filename) -> void
 auto pintool_flush_trace () -> void
 {
   try {
-    flush_trace_in_protobuf_format();
+    if (!trace.empty()) {
+      tfm::format(std::cerr, "flush %d instructions\n", trace.size());
+
+      // add instructions
+      for (auto& ins : trace) {
+        add_instruction_into_chunk(protobuf_chunk, ins);
+      }
+
+      current_trace_length += trace.size();
+
+      auto chunk_size = protobuf_chunk.ByteSize();
+      auto chunk_buffer = std::shared_ptr<char>(new char[chunk_size], std::default_delete<char[]>());
+
+      protobuf_chunk.SerializeToArray(chunk_buffer.get(), chunk_size);
+
+      protobuf_trace_file.write(reinterpret_cast<const char*>(&chunk_size), sizeof(decltype(chunk_size)));
+      protobuf_trace_file.write(chunk_buffer.get(), chunk_size);
+
+      trace.clear();
+      protobuf_chunk.Clear();
+    }
   }
   catch (const std::exception& expt) {
-    tfm::printfln("%s", expt.what());
+    tfm::printfln("exeception: %s", expt.what());
     PIN_ExitProcess(1);
   }
 
