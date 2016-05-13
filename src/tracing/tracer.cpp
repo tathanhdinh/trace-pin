@@ -174,8 +174,7 @@ static auto reinstrument_if_needed (const CONTEXT* p_ctxt, ADDRINT ins_addr) -> 
 template <event_t event>
 static auto update_condition (ADDRINT ins_addr, THREADID thread_id) -> void
 {
-  static_assert((event == NEW_THREAD) || (event == ENABLE_TO_SUSPEND) ||
-                (event == ANY_TO_DISABLE) || (event == ANY_TO_TERMINATE) ||
+  static_assert((event == NEW_THREAD) || (event == ENABLE_TO_SUSPEND) || (event == ANY_TO_DISABLE) || (event == ANY_TO_TERMINATE) ||
                 (event == NOT_START_TO_ENABLE) || (event == SUSPEND_TO_ENABLE), "unknow event");
 
   switch (event) {
@@ -306,30 +305,6 @@ static auto save_register (const CONTEXT* p_context, THREADID thread_id) -> void
   return;
 }
 
-//enum rw_t { LOAD = 0, STORE = 1 };
-//template <rw_t read_or_write>
-//static auto save_memory (ADDRINT mem_addr, UINT32 mem_size, THREADID thread_id) -> void
-//{
-//  if (ins_at_thread.find(thread_id) != ins_at_thread.end()) {
-
-//    if (state_of_thread[thread_id] == ENABLED) {
-
-//      // any chance for compile time evaluation !?
-//      auto& mem_map = (read_or_write == LOAD) ? std::get<INS_LOAD_MEMS>(ins_at_thread[thread_id]) :
-//                                                std::get<INS_STORE_MEMS>(ins_at_thread[thread_id]);
-
-//      if (mem_addr != 0) {
-//        for (decltype(mem_size) idx = 0; idx < mem_size; ++idx) {
-//          mem_map[mem_addr + idx] = *(reinterpret_cast<uint8_t*>(mem_addr + idx));
-//        }
-//      }
-
-//    }
-//  }
-
-//  return;
-//}
-
 
 static auto save_memory_load (ADDRINT mem_addr, UINT32 mem_size, THREADID thread_id) -> void
 {
@@ -363,7 +338,10 @@ static auto add_instruction_into_trace (ADDRINT ins_addr, THREADID thread_id) ->
 {
   static_cast<void>(ins_addr);
 
-  if (instruction_at_thread.find(thread_id) != instruction_at_thread.end() && state_of_thread[thread_id] == ENABLED) {
+  // auto should_add_cached_instruction = is_cached && instruction_at_thread.find(thread_id) != std::end(instruction_at_thread);
+  // auto should_add_noncached_instruction = !is_cached && state_of_thread[thread_id] == ENABLED;
+
+  if (state_of_thread[thread_id] == ENABLED) {
     auto& mem_store_map = std::get<INS_STORE_MEMS>(instruction_at_thread[thread_id]);
     for (auto& mem_val : mem_store_map) {
       auto byte_buffer = uint8_t{0};
@@ -387,6 +365,15 @@ static auto add_instruction_into_trace (ADDRINT ins_addr, THREADID thread_id) ->
       }
   }
 
+  return;
+}
+
+
+static auto add_cached_instruction_into_trace (const CONTEXT* p_context, THREADID thread_id) -> void
+{
+  if (instruction_at_thread.find(thread_id) != std::end(instruction_at_thread)) {
+
+  }
   return;
 }
 
@@ -415,8 +402,7 @@ static auto update_execution_order (ADDRINT ins_addr, THREADID thread_id) -> voi
 }
 
 
-static auto patch_register (ADDRINT ins_addr, bool patch_point, UINT32 patch_reg, PIN_REGISTER* p_register,
-                            THREADID thread_id) -> void
+static auto patch_register (ADDRINT ins_addr, bool patch_point, UINT32 patch_reg, PIN_REGISTER* p_register, THREADID thread_id) -> void
 {
   static_cast<void>(thread_id);
 
@@ -425,9 +411,9 @@ static auto patch_register (ADDRINT ins_addr, bool patch_point, UINT32 patch_reg
     auto patch_exec_point = std::get<0>(patch_reg_info);
     auto patch_reg_value  = std::get<1>(patch_reg_info);
 
-    auto exec_point        = std::get<0>(patch_exec_point);
-    auto exec_addr         = std::get<0>(exec_point);
-    auto exec_order        = std::get<1>(exec_point);
+    auto exec_point = std::get<0>(patch_exec_point);
+    auto exec_addr  = std::get<0>(exec_point);
+    auto exec_order = std::get<1>(exec_point);
 
     auto needed_patch_point = std::get<1>(patch_exec_point);
     auto needed_patch_reg   = std::get<0>(patch_reg_value);
@@ -435,9 +421,9 @@ static auto patch_register (ADDRINT ins_addr, bool patch_point, UINT32 patch_reg
     if ((exec_addr == ins_addr) && (exec_order == execution_order_of_instruction_at_address[ins_addr]) &&
         (needed_patch_point == patch_point) && (needed_patch_reg == patch_reg)) {
 
-      auto reg_info        = std::get<1>(patch_reg_info);
-      auto reg_size        = static_cast<uint8_t>(REG_Size(std::get<0>(reg_info)));
-      auto reg_patch_val   = std::get<1>(reg_info);
+      auto reg_info      = std::get<1>(patch_reg_info);
+      auto reg_size      = static_cast<uint8_t>(REG_Size(std::get<0>(reg_info)));
+      auto reg_patch_val = std::get<1>(reg_info);
 
       switch (reg_size) {
       case 1:
@@ -469,8 +455,7 @@ static auto patch_register (ADDRINT ins_addr, bool patch_point, UINT32 patch_reg
 /*
  * Because the thread_id is not used in this function, the memory patching is realized actually by any thread.
  */
-static auto patch_memory (ADDRINT ins_addr, bool patch_point, ADDRINT patch_mem_addr,
-                          THREADID thread_id) -> void
+static auto patch_memory (ADDRINT ins_addr, bool patch_point, ADDRINT patch_mem_addr, THREADID thread_id) -> void
 {
   static_cast<void>(thread_id);
 
@@ -479,9 +464,9 @@ static auto patch_memory (ADDRINT ins_addr, bool patch_point, ADDRINT patch_mem_
     auto patch_exec_point = std::get<0>(patch_mem_info);
     auto patch_mem_value  = std::get<1>(patch_mem_info);
 
-    auto exec_point        = std::get<0>(patch_exec_point);
-    auto exec_addr         = std::get<0>(exec_point);
-    auto exec_order        = std::get<1>(exec_point);
+    auto exec_point = std::get<0>(patch_exec_point);
+    auto exec_addr  = std::get<0>(exec_point);
+    auto exec_order = std::get<1>(exec_point);
 
     auto needed_patch_point    = std::get<1>(patch_exec_point);
     auto needed_patch_mem_addr = std::get<0>(patch_mem_value);
@@ -554,6 +539,12 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
                     IARG_END);
   }
 
+    static_assert(std::is_same<decltype(add_instruction_into_trace), VOID (ADDRINT, UINT32)>::value, "invalid callback function type");
+
+    ins_insert_call(ins, IPOINT_BEFORE, reinterpret_cast<AFUNPTR>(add_instruction_into_trace),
+                    IARG_INST_PTR,
+                    IARG_THREAD_ID,
+                    IARG_END);
 
   if (some_thread_is_started) {
     // we must always verify whether there is a new execution thread or not
@@ -588,12 +579,6 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
                         IARG_THREAD_ID,
                         IARG_END);
       }
-
-//      ins_insert_call(ins,
-//                      IPOINT_BEFORE,
-//                      reinterpret_cast<AFUNPTR>(remove_previous_instruction),
-//                      IARG_THREAD_ID,
-//                      IARG_END);
     } // end of if (some_thread_is_not_suspended)
 
 
@@ -647,7 +632,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
                         IARG_END);
       }
 
-      if (!current_ins->dst_registers.empty()) {
+      if (!current_ins->dst_registers.empty() && current_ins->has_fall_through) {
         ins_insert_call(ins,
                         IPOINT_AFTER,
                         reinterpret_cast<AFUNPTR>(save_register<REG_WRITE>),
@@ -700,9 +685,6 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
                         IARG_INST_PTR,
                         IARG_THREAD_ID,
                         IARG_END);
-      }
-      else {
-
       }
     }
   }
