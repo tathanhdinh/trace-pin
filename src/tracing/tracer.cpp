@@ -372,6 +372,7 @@ static auto add_instruction_into_trace (ADDRINT ins_addr, THREADID thread_id) ->
     }
 
     trace.push_back(instruction_at_thread[thread_id]);
+    instruction_at_thread.erase(thread_id);
 
     if (trace.size() >= chunk_size) {
         current_trace_length += trace.size();
@@ -390,13 +391,13 @@ static auto add_instruction_into_trace (ADDRINT ins_addr, THREADID thread_id) ->
 }
 
 
-static auto remove_previous_instruction (THREADID thread_id) -> void
-{
-  if (instruction_at_thread.find(thread_id) != instruction_at_thread.end()) {
-    instruction_at_thread.erase(thread_id);
-  }
-  return;
-}
+//static auto remove_previous_instruction (THREADID thread_id) -> void
+//{
+//  if (instruction_at_thread.find(thread_id) != instruction_at_thread.end()) {
+//    instruction_at_thread.erase(thread_id);
+//  }
+//  return;
+//}
 
 
 static auto update_execution_order (ADDRINT ins_addr, THREADID thread_id) -> void
@@ -497,7 +498,7 @@ static auto patch_memory (ADDRINT ins_addr, bool patch_point, ADDRINT patch_mem_
 }
 
 
-static auto update_condition_before_handling (INS ins) -> void
+static auto run_tracing_state_machine (INS ins) -> void
 {
   static_assert(std::is_same<
                 decltype(update_condition<ANY_TO_DISABLE>), VOID (ADDRINT, UINT32)
@@ -567,7 +568,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
      * The following state update callback functions are CALLED ALWAYS, even when all threads are suspended. These
      * functions need to detect if there is some thread goes out of the suspended state.
      */
-    update_condition_before_handling(ins);
+    run_tracing_state_machine(ins);
 
     /*
      * The following callback function is called only if there is some non-suspended state, if all states are suspended
@@ -588,11 +589,11 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
                         IARG_END);
       }
 
-      ins_insert_call(ins,
-                      IPOINT_BEFORE,
-                      reinterpret_cast<AFUNPTR>(remove_previous_instruction),
-                      IARG_THREAD_ID,
-                      IARG_END);
+//      ins_insert_call(ins,
+//                      IPOINT_BEFORE,
+//                      reinterpret_cast<AFUNPTR>(remove_previous_instruction),
+//                      IARG_THREAD_ID,
+//                      IARG_END);
     } // end of if (some_thread_is_not_suspended)
 
 
@@ -606,8 +607,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
      * explicitly makes callback functions after it be called or not.
      */
 
-    static_assert(std::is_same<decltype(reinstrument_if_needed), VOID (const CONTEXT*, ADDRINT)>::value,
-                  "invalid callback function type");
+    static_assert(std::is_same<decltype(reinstrument_if_needed), VOID (const CONTEXT*, ADDRINT)>::value, "invalid callback function type");
 
     // ATTENTION: this function can change the inserted instrumentation functions
     ins_insert_call(ins,
@@ -627,8 +627,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
 
     if (some_thread_is_not_suspended) {
       // initialize and save information of the CURRENT instruction
-      static_assert(std::is_same<decltype(initialize_instruction), VOID (ADDRINT, UINT32)>::value,
-                    "invalid callback function type");
+      static_assert(std::is_same<decltype(initialize_instruction), VOID (ADDRINT, UINT32)>::value, "invalid callback function type");
 
       ins_insert_call(ins,                                               // instrumented instruction
                       IPOINT_BEFORE,                                     // instrumentation point
@@ -638,8 +637,7 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
                       IARG_END);
 
       if (!current_ins->src_registers.empty()) {
-        static_assert(std::is_same<decltype(save_register<REG_READ>), VOID (const CONTEXT*, UINT32)>::value,
-                      "invalid callback function type");
+        static_assert(std::is_same<decltype(save_register<REG_READ>), VOID (const CONTEXT*, UINT32)>::value, "invalid callback function type");
 
         ins_insert_call(ins,                                                // instrumented instruction
                         IPOINT_BEFORE,                                      // instrumentation point
@@ -693,14 +691,19 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
       }
 
       /*
-       * Now, add the instruction into the trace
+       * Now, add the instruction into the trace after it is executed
        */
-      static_assert(std::is_same<decltype(add_instruction_into_trace), VOID (ADDRINT, UINT32)>::value, "invalid callback function type");
+      if (current_ins->has_fall_through) {
+        static_assert(std::is_same<decltype(add_instruction_into_trace), VOID (ADDRINT, UINT32)>::value, "invalid callback function type");
 
-      ins_insert_call(ins, IPOINT_AFTER, reinterpret_cast<AFUNPTR>(add_instruction_into_trace),
-                      IARG_INST_PTR,
-                      IARG_THREAD_ID,
-                      IARG_END);
+        ins_insert_call(ins, IPOINT_AFTER, reinterpret_cast<AFUNPTR>(add_instruction_into_trace),
+                        IARG_INST_PTR,
+                        IARG_THREAD_ID,
+                        IARG_END);
+      }
+      else {
+
+      }
     }
   }
   else { // !some_thread_is_started
@@ -719,34 +722,34 @@ static auto insert_instruction_get_info_callbacks (INS ins) -> void
                       "invalid callback function type");
 
         ins_insert_call(ins,
-                               IPOINT_BEFORE,
-                               reinterpret_cast<AFUNPTR>(reinstrument_if_some_thread_started),
-                               IARG_INST_PTR,
-                               IARG_BRANCH_TARGET_ADDR,
-                               IARG_CONST_CONTEXT,
-                               IARG_END);
+                        IPOINT_BEFORE,
+                        reinterpret_cast<AFUNPTR>(reinstrument_if_some_thread_started),
+                        IARG_INST_PTR,
+                        IARG_BRANCH_TARGET_ADDR,
+                        IARG_CONST_CONTEXT,
+                        IARG_END);
       }
       else {
         if (current_ins->is_ret) {
           ins_insert_call(ins,
-                                 IPOINT_BEFORE,
-                                 reinterpret_cast<AFUNPTR>(reinstrument_if_some_thread_started),
-                                 IARG_INST_PTR,
-                                 IARG_REG_VALUE, REG_STACK_PTR,
-                                 IARG_CONST_CONTEXT,
-                                 IARG_END);
+                          IPOINT_BEFORE,
+                          reinterpret_cast<AFUNPTR>(reinstrument_if_some_thread_started),
+                          IARG_INST_PTR,
+                          IARG_REG_VALUE, REG_STACK_PTR,
+                          IARG_CONST_CONTEXT,
+                          IARG_END);
         }
         else {
           static_assert(std::is_same<decltype(reinstrument_if_some_thread_started), VOID (ADDRINT, ADDRINT, const CONTEXT*)>::value,
                         "invalid callback function type");
 
           ins_insert_call(ins,
-                                 IPOINT_BEFORE,
-                                 reinterpret_cast<AFUNPTR>(reinstrument_if_some_thread_started),
-                                 IARG_INST_PTR,
-                                 IARG_ADDRINT, current_ins->next_address,
-                                 IARG_CONST_CONTEXT,
-                                 IARG_END);
+                          IPOINT_BEFORE,
+                          reinterpret_cast<AFUNPTR>(reinstrument_if_some_thread_started),
+                          IARG_INST_PTR,
+                          IARG_ADDRINT, current_ins->next_address,
+                          IARG_CONST_CONTEXT,
+                          IARG_END);
         }
       }
     }

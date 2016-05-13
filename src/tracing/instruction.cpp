@@ -66,7 +66,7 @@ instruction::instruction(const INS& ins)
 
 
   // is memory read, write
-  this->is_memory_read    = INS_IsMemoryRead(ins);
-  this->is_memory_write   = INS_IsMemoryWrite(ins);
+  this->is_memory_read  = INS_IsMemoryRead(ins);
+  this->is_memory_write = INS_IsMemoryWrite(ins);
   this->is_memory_read2 = INS_HasMemoryRead2(ins);
 }
