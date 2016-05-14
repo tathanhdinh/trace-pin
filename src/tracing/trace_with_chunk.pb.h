@@ -46,13 +46,14 @@ class memory_t;
 class register_t;
 
 enum architecture_t {
-  X86 = 0,
-  X86_64 = 1,
+  Unknown = 0,
+  X86 = 1,
+  X86_64 = 2,
   architecture_t_INT_MIN_SENTINEL_DO_NOT_USE_ = ::google::protobuf::kint32min,
   architecture_t_INT_MAX_SENTINEL_DO_NOT_USE_ = ::google::protobuf::kint32max
 };
 bool architecture_t_IsValid(int value);
-const architecture_t architecture_t_MIN = X86;
+const architecture_t architecture_t_MIN = Unknown;
 const architecture_t architecture_t_MAX = X86_64;
 const int architecture_t_ARRAYSIZE = architecture_t_MAX + 1;
 

@@ -198,7 +198,7 @@ auto get_application_name (int argc, char* argv[]) -> std::string
 /*
  * Load Pintool's configuration from json file
  */
-auto load_configuration (int argc, char* argv[]) -> void
+auto pintool_initialization (int argc, char* argv[]) -> void
 {
   auto app_name = get_application_name(argc, argv);
 
@@ -208,7 +208,7 @@ auto load_configuration (int argc, char* argv[]) -> void
     config_filename = app_name + ".json";
     tfm::printfln("the configuration filename is empty, try to guess it from the application name; %s", config_filename);
   }
-  tfm::format(std::cerr, "parse configuration from file %s...\n", config_filename);
+  tfm::format(std::cerr, "parse configuration from file: %s...\n", config_filename);
   parse_configuration(config_filename);
 
   // initialize trace file, code cache, set start/stop addresses to 0x0
@@ -302,8 +302,8 @@ auto main(int argc, char* argv[]) -> int
   else {
     tfm::format(std::cerr, "initialize Pin successfully...\n");
 
-    tfm::format(std::cerr, "load configuration and options...\n");
-    load_configuration(argc, argv);
+    tfm::format(std::cerr, "load configuration and initialize some variables...\n");
+    pintool_initialization(argc, argv);
 
 //    tfm::printfln("add start function...");
 //    PIN_AddApplicationStartFunction(load_configuration_and_options, UNUSED_DATA);

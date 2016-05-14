@@ -28,12 +28,14 @@ static auto set_trace_header () -> void
 
   // get header size and declare a buffer to serialize
   auto header_size = trace_header.ByteSize();
+  tfm::printfln("header size: %d", header_size);
   auto header_buffer = std::shared_ptr<char>(new char[header_size], std::default_delete<char[]>());
 
   // serialize header to the buffer
   trace_header.SerializeToArray(header_buffer.get(), header_size);
 
   // save the length of the header and the buffer
+
   protobuf_trace_file.write(reinterpret_cast<const char*>(&header_size), sizeof(decltype(header_size)));
   protobuf_trace_file.write(header_buffer.get(), header_size);
 
@@ -71,9 +73,9 @@ auto add_registers_into_protobuf_instruction(const dyn_instruction_t& ins, const
 }
 
 
-enum MEM_RW_T { MEM_LOAD = 0, MEM_STORE = 1 };
+enum MEM_LS_T { MEM_LOAD = 0, MEM_STORE = 1 };
 auto add_memories_into_protobuf_instruction (const dyn_instruction_t& ins,
-                                             trace_format::instruction_t* p_proto_ins, MEM_RW_T mem_type) -> void
+                                             trace_format::instruction_t* p_proto_ins, MEM_LS_T mem_type) -> void
 {
   const auto& mems = (mem_type == MEM_LOAD) ? std::get<INS_LOAD_MEMS>(ins) : std::get<INS_STORE_MEMS>(ins);
 
@@ -143,11 +145,12 @@ static auto add_instruction_into_chunk (trace_format::chunk_t& chunk, const dyn_
 auto pintool_initialize_trace_file (const std::string& filename) -> void
 {
   try {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
     protobuf_trace_file.open(filename.c_str(), std::ofstream::out | std::ofstream::binary | std::ofstream::trunc);
     set_trace_header();
   }
   catch (const std::exception& expt) {
-    tfm::printfln("%s", expt.what());
+    tfm::printfln("exeption: %s", expt.what());
     PIN_ExitProcess(1);
   }
 }
@@ -166,6 +169,7 @@ auto pintool_flush_trace () -> void
       current_trace_length += trace.size();
 
       auto chunk_size = protobuf_chunk.ByteSize();
+      tfm::printfln("chunk size: %d", chunk_size);
       auto chunk_buffer = std::shared_ptr<char>(new char[chunk_size], std::default_delete<char[]>());
 
       protobuf_chunk.SerializeToArray(chunk_buffer.get(), chunk_size);
@@ -195,7 +199,7 @@ auto pintool_finalize_output_file () -> void
     google::protobuf::ShutdownProtobufLibrary();
   }
   catch (const std::exception& expt) {
-    tfm::printfln("%s", expt.what());
+    tfm::printfln("exeption: %s", expt.what());
     PIN_ExitProcess(1);
   }
 }

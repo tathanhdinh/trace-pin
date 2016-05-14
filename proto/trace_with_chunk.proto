@@ -14,8 +14,9 @@ package trace_format;
 
 enum architecture_t
 {
-  X86    = 0;
-  X86_64 = 1;
+  Unknown = 0;
+  X86     = 1;
+  X86_64  = 2;
 }
 
 /* address = value_32 | value_64 */

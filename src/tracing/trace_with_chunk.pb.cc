@@ -259,8 +259,9 @@ void protobuf_AddDesc_trace_5fwith_5fchunk_2eproto() {
     "race_format.concrete_info_t\">\n\010header_t\022"
     "2\n\014architecture\030\001 \001(\0162\034.trace_format.arc"
     "hitecture_t\"<\n\007chunk_t\0221\n\014instructions\030\001"
-    " \003(\0132\033.trace_format.instruction_t*%\n\016arc"
-    "hitecture_t\022\007\n\003X86\020\000\022\n\n\006X86_64\020\001b\006proto3", 800);
+    " \003(\0132\033.trace_format.instruction_t*2\n\016arc"
+    "hitecture_t\022\013\n\007Unknown\020\000\022\007\n\003X86\020\001\022\n\n\006X86"
+    "_64\020\002b\006proto3", 813);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "trace_with_chunk.proto", &protobuf_RegisterTypes);
   address_t::default_instance_ = new address_t();
@@ -296,6 +297,7 @@ bool architecture_t_IsValid(int value) {
   switch(value) {
     case 0:
     case 1:
+    case 2:
       return true;
     default:
       return false;
